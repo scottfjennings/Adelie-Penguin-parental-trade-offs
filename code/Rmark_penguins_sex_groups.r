@@ -1,30 +1,33 @@
 #need to tell R that Mark is not stored in C:\Program Files
 
-#personal computer
-#MarkPath="C:/Users/Scott/Mark/"
+#ACR computer
+MarkPath="C:/Program Files (x86)/MARK"
 library(RMark)
-
-setwd("C:/Users/Scott/Documents/THESIS/Data")
-options(scipen = 999)
-
-##		add required packages
 library(lme4) 
 library(AICcmodavg)
 library(grid)
 library(ggplot2)
-library(plyr)
 library(tidyverse)
+library(R2ucare)
+library(here)
+options(scipen = 999)
+
+# setting working directory only to control location for all the Mark output files
+setwd(here("mark_output"))
+
 
 
 # the following script is adapted for my data from appendix C of the Mark book
 
 # CJS analysis of penguin chick survival
+# .inp file is created by hand in a spreadsheet editor, then saved at a .txt, then saved as a .inp
+
 # Import data (all_covs_groups.inp) and convert it from the MARK inp file format to the \textbf{RMark}
 # format using the function convert.inp 
 # It is defined with 4 groups: Males in 1213, females in 1213, males in 1314, and females in 1314
 # This structure is defined with the group.df argument of convert.inp. 
 ##C:/Users/jenninsc/Documents/THESIS/Data/resighting_survival/RMark_analysis/
-penguins=convert.inp("resighting_survival/RMark_analysis/all_covs_sex_groups.inp", 
+penguins=convert.inp("C:/Users/scott.jennings/Documents/Projects/THESIS/Thesis/CH4/thesis_ch4_analysis/data/all_covs_sex_groups.inp", 
 					group.df=data.frame(sex=rep(c("Male","Female"),2), SEASON=c(rep("1213",2),rep("1314",2))), 
 					covariates=c("dayold50", "dayold51", "dayold52", "dayold53", "dayold54", "dayold55", "dayold56", 
 					 "dayold57", "dayold58", "dayold59", "dayold60", "dayold61", "dayold62", "dayold63", "dayold64", 
@@ -34,8 +37,7 @@ penguins=convert.inp("resighting_survival/RMark_analysis/all_covs_sex_groups.inp
 					 "dayold89", "dayold90", "dayold91", "dayold92", "dayold93", "dayold94", "dayold95", "dayold96",
 					 "dayold97", "dayold98", "av.food", "av.trip.length", "cr.age", "fail.age", "weight.slope40", 
 					"flipper.slope40", "tibiotar.slope35", "CH_B", "CH_S", "mean.N", "cr.mass", 
-					"res.htch", "cr.flip", "cr.tib", "did.cr", "fate.age" ),use.comments=FALSE) %>% 
-  rename(res.htch = res.htch)
+					"res.htch", "cr.flip", "cr.tib", "did.cr", "fate.age" ),use.comments=FALSE) 
 
 		 
 ##	setting NA values to mean of that field					
@@ -115,219 +117,228 @@ penguins$never.cr=as.numeric(penguins$never.cr)
 # variables (covariates with a small finite set of values) are best handled by using 
 # them to define groups in the data. 
 # need to set begin.time to 51 because RMark considers the first dayold to be the first release dayold, but really I want to consider recaptures beginning on dayold 52.
-penguins.process=process.data(penguins,model="CJS",groups=c("SEASON", "sex"),begin.time=50) 
-penguins.ddl=make.design.data(penguins.process)
+penguins.process = process.data(penguins, model = "CJS", groups = c("SEASON", "sex"), begin.time = 50) 
+penguins.ddl = make.design.data(penguins.process)
 
+# goes to root folder for project -- not sure why need to output these so commented out for now
+# export.MARK(penguins.process, "processed_penguins_ch")
+# export.chdata(penguins.process, filename="penguin", replace=TRUE)
 
-
-export.chdata(penguins.process, filename="penguin", replace=TRUE)
-
-## GOF testing
+## GOF testing ----
+# GOF testing with RELEASE requires no individual covariates and 
+# requires dots in the capture history to be replaced with 0. dot -> 0 is supposed to happen automatically, but for some reason isn't, so doing it manually
 peng.for.gof=subset(penguins, select=c("ch", "freq", "sex", "SEASON"))
 
-count(peng.for.gof, "ch")
-
+peng.for.gof <- peng.for.gof %>% 
+  mutate(ch = gsub("\\.", "0", ch))
 
 peng.for.gof.proc=process.data(peng.for.gof,model="CJS",groups=c("SEASON", "sex"))
 
-penguins.GOF=release.gof(penguins.process)
+release.gof(peng.for.gof.proc)
+# note, release.gof creates mxxx.tmp file
+# divide total Chi.square by total df to get estimate of c-hat
+# > 179.5428/144
+# [1] 1.246825
+c_hat = round(179.5428/144, 2)
 
-#########################################
+# fitting models ----
 ##	making models without mark.wrapper
 ##  I think this method of building and running models will be easier because of the npar adjustments I have to make
 ##  using mark.wrapper it is hard to keep track of which model is which, 
 ##  and I don't really have that many models to build.
 
 
-#Determine p structure
-run.model<-function(phi.stru, p.stru) {
-mark(penguins.process,penguins.ddl,model.parameters=list(Phi=phi.stru,p=p.stru), output=FALSE)
+# Determine p structure ----
+run.p.models<-function(p.stru) {
+mark(penguins.process, penguins.ddl, model.parameters = list(Phi = list(formula = ~SEASON * sex + time), p = p.stru), output = FALSE, chat = 1.25)
 }
-peng.phi.gen.p.gen=run.model(list(formula=~SEASON*sex*time),list(formula=~SEASON*sex*time))
-peng.phi.gen.p.SEASON=run.model(list(formula=~SEASON*sex*time),list(formula=~SEASON))
-peng.phi.gen.p.sex=run.model(list(formula=~SEASON*sex*time),list(formula=~sex))
-peng.phi.gen.p.time=run.model(list(formula=~SEASON*sex*time),list(formula=~time))
-peng.phi.gen.p.SEASON.pl.sex=run.model(list(formula=~SEASON*sex*time),list(formula=~SEASON+sex) 	)
-peng.phi.gen.p.SEASON.pl.time=run.model(list(formula=~SEASON*sex*time),list(formula=~SEASON+time) 	)
-peng.phi.gen.p.sex.pl.time=run.model(list(formula=~SEASON*sex*time),list(formula=~sex+time))
-peng.phi.gen.p.dot=run.model(list(formula=~SEASON*sex*time),list(formula=~1))
-peng.phi.gen.p.T=run.model(list(formula=~SEASON*sex*time),list(formula=~(Time+1)))
-peng.phi.gen.p.TT=run.model(list(formula=~SEASON*sex*time),list(formula=~(Time+1)+I((Time+1)^2)))
-peng.phi.gen.p.lnT=run.model(list(formula=~SEASON*sex*time),list(formula=~log(Time+1)))
-peng.phi.gen.p.cr=run.model(list(formula=~SEASON*sex*time),list(formula=~cr))
+# resighting varies by interaction between season, sex and time -- most general model
+peng.phi.gen.p.gen = run.p.models(list(formula = ~SEASON * sex + time))
+# resighting varies by season
+peng.phi.gen.p.SEASON = run.p.models(list(formula = ~SEASON))
+# resighting varies by sex
+peng.phi.gen.p.sex = run.p.models(list(formula = ~sex))
+# resighting varies by time
+peng.phi.gen.p.time = run.p.models(list(formula = ~time))
+# resighting varies by season + sex
+peng.phi.gen.p.SEASON.pl.sex = run.p.models(list(formula = ~SEASON + sex))
+# resighting varies by season + time
+peng.phi.gen.p.SEASON.pl.time = run.p.models(list(formula = ~SEASON + time))
+# resighting varies by sex + time
+peng.phi.gen.p.sex.pl.time = run.p.models(list(formula = ~sex + time))
+# resighting does not vary -- intercept only
+peng.phi.gen.p.dot = run.p.models(list(formula = ~1))
+# resighting varies by linear time
+peng.phi.gen.p.T = run.p.models(list(formula = ~(Time + 1)))
+# resighting varies by quadratic time
+peng.phi.gen.p.TT = run.p.models(list(formula = ~(Time + 1) + I((Time + 1)^2)))
+# resighting varies by natural log time
+peng.phi.gen.p.lnT = run.p.models(list(formula = ~log(Time+1)))
+# resighting varies by whether or not chick was in creche stage on that day
+peng.phi.gen.p.cr = run.p.models(list(formula = ~in.cr))
+
+
+p_mod_names <- c("peng.phi.gen.p.gen", "peng.phi.gen.p.SEASON", "peng.phi.gen.p.sex", "peng.phi.gen.p.time", "peng.phi.gen.p.SEASON.pl.sex", "peng.phi.gen.p.SEASON.pl.time", "peng.phi.gen.p.sex.pl.time", "peng.phi.gen.p.dot", "peng.phi.gen.p.T", "peng.phi.gen.p.TT", "peng.phi.gen.p.lnT", "peng.phi.gen.p.cr")
 
 ##  now collect models into one object to make a model comparison table
-peng.p=collect.models()
+peng.p=collect.models(p_mod_names)
+
+saveRDS(peng.p, here("rds/p_mod_list"))
+
+peng.p <- readRDS(here("rds/p_mod_list"))
+
 model.table(peng.p, use.lnl=TRUE) 
-peng.p.adj=adjust.chat(1.24, peng.p)
+peng.p.adj=adjust.chat(1.25, peng.p)
+saveRDS(peng.p.adj, "rds/p_mod_list_chat1.25")
 p_table <- model.table(peng.p.adj, use.lnl=TRUE) 
-write.csv(p_table, "C:/Users/Scott/Documents/THESIS/Thesis/CH4/MSdocs/p_table.csv", row.names = F)
-## real and beta estimates
-##	!! need to make sure xls file is created first
-library(xlsx)
-write.p.est<-function (mod, mod.name) {
-mod.beta=as.data.frame(mod$results$beta)
-write.csv(mod.beta, "temp/mod.beta.csv")
-mod.beta.b=read.csv("temp/mod.beta.csv")
-file.remove("temp/mod.beta.csv")
-mod.beta.b$parm.type="beta"
-colnames(mod.beta.b)[1] <- 'parm'
+saveRDS(p_table, "rds/p_qaic_chat1.25")
 
-mod.real=as.data.frame(mod$results$real)
-write.csv(mod.real, "temp/mod.real.csv")
-mod.real.b=read.csv("temp/mod.real.csv")
-file.remove("temp/mod.real.csv")
-mod.real.b$parm.type="real"
-colnames(mod.real.b)[1] <- 'parm'
-mod.real.a=subset(mod.real.b, select=c("parm", "estimate", "se", "lcl", "ucl", "parm.type"))
-
-mod.est=rbind(mod.beta.b, mod.real.a)
-
-write.xlsx(mod.est, "figs_summaries/CH3/sex_groups/p_est.xlsx", sheetName=mod.name, col.names=TRUE, row.names=TRUE, append=TRUE, showNA=TRUE)			
-}						
-
-write.p.est(peng.phi.gen.p.gen, "peng.phi.gen.p.gen")
-write.p.est(peng.phi.gen.p.SEASON, "peng.phi.gen.p.SEASON")
-write.p.est(peng.phi.gen.p.sex, "peng.phi.gen.p.sex")
-write.p.est(peng.phi.gen.p.time, "peng.phi.gen.p.time")
-write.p.est(peng.phi.gen.p.SEASON.pl.sex, "peng.phi.gen.p.SEASON.pl.sex")
-write.p.est(peng.phi.gen.p.SEASON.pl.time, "peng.phi.gen.p.SEASON.pl.time")
-write.p.est(peng.phi.gen.p.sex.pl.time, "peng.phi.gen.p.sex.pl.time")
-write.p.est(peng.phi.gen.p.dot, "peng.phi.gen.p.dot")
-write.p.est(peng.phi.gen.p.T, "peng.phi.gen.p.T")
-write.p.est(peng.phi.gen.p.TT, "peng.phi.gen.p.TT")
-write.p.est(peng.phi.gen.p.lnT, "peng.phi.gen.p.lnT")
-write.p.est(peng.phi.gen.p.cr, "peng.phi.gen.p.cr")
-
-##--
-write.csv(peng.phi.gen.p.gen$design.matrix, "figs_summaries/CH3/bydate/temp/p.gen_dm_p.csv")
-write.csv(peng.phi.gen.p.SEASON$design.matrix, "figs_summaries/CH3/bydate/temp/p.season_dm.csv")
-write.csv(peng.phi.gen.p.sex$design.matrix, "figs_summaries/CH3/bydate/temp/p.sex_dm.csv")
-write.csv(peng.phi.gen.p.time$design.matrix, "figs_summaries/CH3/bydate/temp/p.time_dm.csv")
-write.csv(peng.phi.gen.p.SEASON.pl.sex$design.matrix, "figs_summaries/CH3/bydate/temp/p.SEASsex_dm.csv")
-write.csv(peng.phi.gen.p.SEASON.pl.time$design.matrix, "figs_summaries/CH3/bydate/temp/p.SEAS.time.csv")
-write.csv(peng.phi.gen.p.sex.pl.time$design.matrix, "figs_summaries/CH3/bydate/temp/p.sex.time.csv")
-write.csv(peng.phi.gen.p.dot$design.matrix, "figs_summaries/CH3/bydate/temp/p.dot.csv")
-write.csv(peng.phi.gen.p.T$design.matrix, "figs_summaries/CH3/bydate/temp/p.T.csv")
-write.csv(peng.phi.gen.p.TT$design.matrix, "figs_summaries/CH3/bydate/temp/p.TT.csv")
-write.csv(peng.phi.gen.p.lnT$design.matrix, "figs_summaries/CH3/bydate/temp/p.lnT.csv")
-write.csv(peng.phi.gen.p.cr$design.matrix, "figs_summaries/CH3/bydate/temp/p.cr.csv")
+#c hat by hand
+peng.phi.gen.p.gen$results$deviance/peng.phi.gen.p.gen$results$deviance.df
 
 
 	
-################################
+# determine phi structure ----
 ###	now moving on to modeling Phi, with the best p structure from above, which is SEASON+time
 
-run.model<-function(phi.stru, p.stru) {
-mark(penguins.process,penguins.ddl,model.parameters=list(Phi=phi.stru,p=list(formula=~SEASON+time)), output=FALSE, chat=1.24)
+run.phi.model<-function(phi.stru) {
+mark(penguins.process, penguins.ddl, model.parameters = list(Phi = phi.stru, p = list(formula = ~SEASON + time)), output = FALSE, chat = 1.25)
 }
 
-##	first step will be to determine effect of SEASON and sex
-Phi.SEASON.x.sex=run.model(list(formula=~SEASON*sex))
-Phi.SEASON_sex=run.model(list(formula=~SEASON+sex))
-Phi.SEASON=run.model(list(formula=~SEASON))
-Phi.sex=run.model(list(formula=~sex))
-Phi.dot=run.model(list(formula=~1))
+##	Phi step 1: determine effect of SEASON and sex ----
+Phi.SEASON.sex = run.phi.model(list(formula = ~SEASON * sex))
+Phi.SEASON_sex = run.phi.model(list(formula = ~SEASON + sex))
+Phi.SEASON = run.phi.model(list(formula = ~SEASON))
+Phi.sex = run.phi.model(list(formula = ~sex))
+Phi.dot = run.phi.model(list(formula = ~1))
 
 
-step1=collect.models(lx=c("Phi.SEASON.x.sex", "Phi.SEASON_sex", "Phi.SEASON", "Phi.sex", "Phi.dot"))
-phi_table1 <- model.table(step1, use.lnl=TRUE) 
-
-write.csv(phi_table1, "C:/Users/Scott/Documents/THESIS/Thesis/CH4/MSdocs/phi_table1.csv", row.names = F)
-Phi.SEASON.x.sex$design.matrix
-##---
-
-export.chdata(peng.for.gof.proc, filename="penguin.gof", replace=TRUE)
-
-export.model(step2)
+phi_step1 = collect.models(lx=c("Phi.SEASON.sex", "Phi.SEASON_sex", "Phi.SEASON", "Phi.sex", "Phi.dot"))
+saveRDS(phi_step1, here("rds/phi_step1"))
+phi_aictable1 <- model.table(phi_step1, use.lnl=TRUE) 
+saveRDS(phi_aictable1, here("rds/phi_aictable1"))
+# these models fitted and saved 7/8/21
 
 
-write.csv(Phi.cr.x.age_lnT$design.matrix, "figs_summaries/CH3/bydate/temp/Phi.cr.x.age_lnT.csv")
-write.csv(Phi.SEASON_sex$design.matrix, "figs_summaries/CH3/bydate/temp/Phi.SEASON_sex.csv")
-write.csv(Phi.SEASON$design.matrix, "figs_summaries/CH3/bydate/temp/Phi.SEASON.csv")
-write.csv(Phi.sex$design.matrix, "figs_summaries/CH3/bydate/temp/Phi.sex.csv")
+## phi Step 2:	is relative hatch date important? ----
+# Phi.y.s=run.phi.model(list(formula=~SEASON*sex))
+# Phi.res.htch_y.s=run.phi.model(list(formula=~res.htch+SEASON*sex))
+# Phi.res.htch.y.s=run.phi.model(list(formula=~res.htch*SEASON*sex))
+# Phi.res.htch2_y.s=run.phi.model(list(formula=~res.htch+I(res.htch^2)+SEASON*sex))
 
-## Step 2	is relative hatch date important?
-Phi.y.s=run.model(list(formula=~SEASON*sex))
-Phi.res.htch_y.s=run.model(list(formula=~res.htch+SEASON*sex))
-Phi.res.htch.y.s=run.model(list(formula=~res.htch*SEASON*sex))
-Phi.res.htch2_y.s=run.model(list(formula=~res.htch+I(res.htch^2)+SEASON*sex))
+# phi_step2=collect.models(lx=c("Phi.y.s", "Phi.res.htch_y.s", "Phi.res.htch.y.s", "Phi.res.htch2_y.s"))
+# saveRDS(phi_step2, here("rds/phi_step2"))
+# phi_aictable2 <- model.table(phi_step2, use.lnl=TRUE) 
+# saveRDS(phi_aictable2, here("rds/phi_aictable2"))
+# these models fitted and saved 7/8/21
 
-step2=collect.models(lx=c("Phi.y.s", "Phi.res.htch_y.s", "Phi.res.htch.y.s", "Phi.res.htch2_y.s"))
-model.table(step2, use.lnl=TRUE) 
+# 7/8/21: the above 4 models (commented out) were the candidate set for this part of the analysis when done for my thesis. at that time only the SEASON*Sex structure from the previous step was considered to have enough support to be used in future steps. now it seems the SEASON only structure is also well supported (not sure what changed in the data), so now we construct the candidate set for this step based on both of those supported structures from the previous step. For some reason in June I also thought that the SEASON + Sex  and Sex structures needed to be included; I'm commenting those out below for now (might remember why I included them), but they should be deleted if not needed
 
+Phi.SEASON.sex = run.phi.model(list(formula = ~SEASON * sex))
+# Phi.SEASON_sex = run.phi.model(list(formula = ~SEASON + sex))
+Phi.SEASON = run.phi.model(list(formula = ~SEASON))
+#Phi.sex = run.phi.model(list(formula = ~sex))
 
-Phi.SEASON.x.sex = run.model(list(formula = ~SEASON * sex))
-Phi.SEASON_sex = run.model(list(formula = ~SEASON + sex))
-Phi.SEASON = run.model(list(formula = ~SEASON))
-Phi.sex = run.model(list(formula = ~sex))
-Phi.dot = run.model(list(formula = ~1))
-Phi.y.s = run.model(list(formula = ~SEASON * sex))
+# SEASON * Sex with 3 residual hatch date options
+Phi.SEASON.sex_hatch = run.phi.model(list(formula = ~res.htch + SEASON * sex))
+Phi.SEASON.sex.hatch = run.phi.model(list(formula = ~res.htch * SEASON * sex))
+Phi.SEASON.sex_hatch2 = run.phi.model(list(formula = ~res.htch + I(res.htch^2) + SEASON * sex))
 
-Phi.res.htch_y.s = run.model(list(formula = ~res.htch + SEASON * sex))
-Phi.res.htch.y.s = run.model(list(formula = ~res.htch * SEASON * sex))
-Phi.res.htch2_y.s = run.model(list(formula = ~res.htch + I(res.htch^2) + SEASON * sex))
+# Phi.res.htch_y_s = run.phi.model(list(formula = ~res.htch + SEASON + sex))
+# Phi.res.htch.y_s = run.phi.model(list(formula = ~res.htch * SEASON + sex))
+# Phi.res.htch2_y_s = run.phi.model(list(formula = ~res.htch + I(res.htch^2) + SEASON + sex))
 
-Phi.res.htch_y_s = run.model(list(formula = ~res.htch + SEASON + sex))
-Phi.res.htch.y_s = run.model(list(formula = ~res.htch * SEASON + sex))
-Phi.res.htch2_y_s = run.model(list(formula = ~res.htch + I(res.htch^2) + SEASON + sex))
+# SEASON * Sex with 3 residual hatch date options
+Phi.SEASON_hatch = run.phi.model(list(formula = ~res.htch + SEASON))
+Phi.SEASON.hatch = run.phi.model(list(formula = ~res.htch * SEASON))
+Phi.SEASON_hatch2 = run.phi.model(list(formula = ~res.htch + I(res.htch^2) + SEASON))
 
-Phi.res.htch_y = run.model(list(formula = ~res.htch + SEASON))
-Phi.res.htch.y = run.model(list(formula = ~res.htch * SEASON))
-Phi.res.htch2_y = run.model(list(formula = ~res.htch + I(res.htch^2) + SEASON))
+# Phi.res.htch_s = run.phi.model(list(formula = ~res.htch + sex))
+# Phi.res.htch.s = run.phi.model(list(formula = ~res.htch * sex))
+# Phi.res.htch2_s = run.phi.model(list(formula = ~res.htch + I(res.htch^2) + sex))
 
-Phi.res.htch_s = run.model(list(formula = ~res.htch + sex))
-Phi.res.htch.s = run.model(list(formula = ~res.htch * sex))
-Phi.res.htch2_s = run.model(list(formula = ~res.htch + I(res.htch^2) + sex))
+# residual hatch date only
+Phi.hatch = run.phi.model(list(formula = ~res.htch))
+Phi.hatch2 = run.phi.model(list(formula = ~res.htch + I(res.htch^2)))
 
-Phi.res.htch = run.model(list(formula = ~res.htch))
-Phi.res.htch2 = run.model(list(formula = ~res.htch + I(res.htch^2)))
-
-
-step2.1=collect.models(lx=c("Phi.SEASON.x.sex", "Phi.SEASON_sex", "Phi.SEASON", "Phi.sex", "Phi.dot", "Phi.y.s", 
-                          "Phi.res.htch_y.s", "Phi.res.htch.y.s", "Phi.res.htch2_y.s",
-                          "Phi.res.htch_y_s", "Phi.res.htch.y_s", "Phi.res.htch2_y_s",
-                          "Phi.res.htch_y", "Phi.res.htch.y", "Phi.res.htch2_y",
-                          "Phi.res.htch_s", "Phi.res.htch.s", "Phi.res.htch2_s",
-                          "Phi.res.htch", "Phi.res.htch2"))
-phi_combined_base_stru <- model.table(step2.1, use.lnl=TRUE) 
-write.csv(phi_combined_base_stru, "C:/Users/Scott/Documents/THESIS/Thesis/CH4/MSdocs/phi_combined_base_stru.csv", row.names = F)
+# intercept only
+Phi.dot = run.phi.model(list(formula = ~1))
 
 
-##--------
-##	Step 3: take best structure from above and investigate time effects
-Phi.res.htch_y.s=run.model(list(formula=~res.htch+SEASON*sex))
-Phi.t_hatch_y.s=run.model(list(formula=~time+res.htch+SEASON*sex))		#1
-Phi.T_hatch_y.s =run.model(list(formula=~Time+res.htch+SEASON*sex))
-Phi.TT_hatch_y.s=run.model(list(formula=~Time+I(Time^2)+res.htch+SEASON*sex))
-Phi.lnT_hatch_y.s=run.model(list(formula=~log(Time+1)+res.htch+SEASON*sex))
+phi_step2.1=collect.models(lx=c("Phi.SEASON.sex", "Phi.SEASON", 
+                          "Phi.SEASON.sex_hatch", "Phi.SEASON.sex.hatch", "Phi.SEASON.sex_hatch2",
+                          "Phi.SEASON_hatch", "Phi.SEASON.hatch", "Phi.SEASON_hatch2",
+                          "Phi.res.htch", "Phi.res.htch2",
+                          "Phi.dot"))
+saveRDS(phi_step2.1, here("rds/phi_step2.1"))
+phi_aictable2.1 <- model.table(phi_step2.1, use.lnl=TRUE) 
+saveRDS(phi_aictable2.1, here("rds/phi_aictable2.1"))
+# 7/8/21 these models run and saved
+
+## phi	Step 3: take best structures from above and investigate time effects ----
 ##	including time constraints based on time-varying covariates
 #in.cr=time-varying for in cr or not on specific day
 #dayold=time-varying for age on specific day;
-Phi.t_in.cr_hatch_y.s=run.model(list(formula=~time+in.cr+res.htch+SEASON*sex))		#5	#same intercept, diff slope for in.cr
-Phi.t_age_hatch_y.s=run.model(list(formula=~time+dayold+res.htch+SEASON*sex))		#6	same intercept, diff slope for dayold
-Phi.t.in.cr_hatch_y.s=run.model(list(formula=~time:in.cr+res.htch+SEASON*sex))		#same slope, diff intercept for in.cr
-Phi.t.age_hatch_y.s=run.model(list(formula=~time:dayold+res.htch+SEASON*sex))		#8	same slope, diff intercept for dayold
-	
-step3=collect.models(lx=c("Phi.res.htch_y.s", "Phi.t_hatch_y.s", "Phi.T_hatch_y.s", "Phi.TT_hatch_y.s", "Phi.lnT_hatch_y.s", 
-							"Phi.t_in.cr_hatch_y.s", "Phi.t_age_hatch_y.s", "Phi.t.in.cr_hatch_y.s", "Phi.t.age_hatch_y.s"))
-model.table(step3, use.lnl=TRUE) 
 
-step3.adj=adjust.chat(1.24, step3)
-model.table(step3.adj, use.lnl=TRUE) 
+# considering 3 structures from step 2, those with model weight >= 0.1 (could add 1 more step 2 structure to be using models with DAIC <= 2):
+
+# ~res.htch + SEASON - step 2 DAICc = 0
+Phi.SEASON_hatch = run.phi.model(list(formula = ~ SEASON + res.htch))
+Phi.SEASON_hatch_t = run.phi.model(list(formula = ~ SEASON + res.htch + time))	
+Phi.SEASON_hatch_T = run.phi.model(list(formula = ~ SEASON + res.htch + Time))
+Phi.SEASON_hatch_TT = run.phi.model(list(formula = ~ SEASON + res.htch + Time + I(Time^2)))
+Phi.SEASON_hatch_lnT = run.phi.model(list(formula = ~ SEASON + res.htch + log(Time+1)))
+Phi.SEASON_hatch_t_incr = run.phi.model(list(formula = ~ SEASON + res.htch + time + in.cr))		#5	#same intercept, diff slope for in.cr
+Phi.SEASON_hatch_t_age = run.phi.model(list(formula = ~ SEASON + res.htch + time + dayold))		#6	same intercept, diff slope for dayold
+Phi.SEASON_hatch_t.incr = run.phi.model(list(formula = ~ SEASON + res.htch + time:in.cr))		#same slope, diff intercept for in.cr
+Phi.SEASON_hatch_t.age = run.phi.model(list(formula = ~ SEASON + res.htch + time:dayold))		#8	same slope, diff intercept for dayold
+
+# ~res.htch + SEASON * sex - step 2 DAIC = 0.458
+Phi.SEASON.sex_hatch = run.phi.model(list(formula = ~ SEASON * sex + res.htch))
+Phi.SEASON.sex_hatch_t = run.phi.model(list(formula = ~ SEASON * sex + res.htch + time))	
+Phi.SEASON.sex_hatch_T = run.phi.model(list(formula = ~ SEASON * sex + res.htch + Time))
+Phi.SEASON.sex_hatch_TT = run.phi.model(list(formula = ~ SEASON * sex + res.htch + Time + I(Time^2)))
+Phi.SEASON.sex_hatch_lnT = run.phi.model(list(formula = ~ SEASON * sex + res.htch + log(Time+1)))
+Phi.SEASON.sex_hatch_t_incr = run.phi.model(list(formula = ~ SEASON * sex + res.htch + time + in.cr))		#5	#same intercept, diff slope for in.cr
+Phi.SEASON.sex_hatch_t_age = run.phi.model(list(formula = ~ SEASON * sex + res.htch + time + dayold))		#6	same intercept, diff slope for dayold
+Phi.SEASON.sex_hatch_t.incr = run.phi.model(list(formula = ~ SEASON * sex + res.htch + time:in.cr))		#same slope, diff intercept for in.cr
+Phi.t.age_hatch_y.s = run.phi.model(list(formula = ~ SEASON * sex + res.htch + time:dayold))		#8	same slope, diff intercept for dayold
+	
+# ~res.htch - step 2 DAIC = 1.384
+Phi.hatch = run.phi.model(list(formula = ~res.htch))
+Phi.hatch_t = run.phi.model(list(formula = ~ res.htch + time))	
+Phi.hatch_T = run.phi.model(list(formula = ~ res.htch + Time))
+Phi.hatch_TT = run.phi.model(list(formula = ~res.htch + Time + I(Time^2)))
+Phi.hatch_lnT = run.phi.model(list(formula = ~ res.htch + log(Time+1)))
+Phi.hatch_t_incr = run.phi.model(list(formula = ~ res.htch + time + in.cr))		#5	#same intercept, diff slope for in.cr
+Phi.hatch_t_age = run.phi.model(list(formula = ~ res.htch + time + dayold))		#6	same intercept, diff slope for dayold
+Phi.hatch_t.incr = run.phi.model(list(formula = ~ res.htch + time:in.cr))		#same slope, diff intercept for in.cr
+Phi.hatch_t.age = run.phi.model(list(formula = ~ res.htch + time:dayold))
+
+
+phi_step3=collect.models(lx=c("Phi.SEASON_hatch", "Phi.SEASON_hatch_t", "Phi.SEASON_hatch_T", "Phi.SEASON_hatch_TT", "Phi.SEASON_hatch_lnT", 
+							"Phi.SEASON_hatch_t_incr", "Phi.SEASON_hatch_t_age", "Phi.SEASON_hatch_t.incr", "Phi.SEASON_hatch_t.age",
+              #-
+							"Phi.SEASON.sex_hatch", "Phi.SEASON.sex_hatch_t", "Phi.SEASON.sex_hatch_T", "Phi.SEASON.sex_hatch_TT", "Phi.SEASON.sex_hatch_lnT", 
+							"Phi.SEASON.sex_hatch_t_incr", "Phi.SEASON.sex_hatch_t_age", "Phi.SEASON.sex_hatch_t.incr", "Phi.t.age_hatch_y.s",
+              #-
+							"Phi.hatch", "Phi.hatch_t", "Phi.hatch_T", "Phi.hatch_TT", "Phi.hatch_lnT", 
+							"Phi.hatch_t_incr", "Phi.hatch_t_age", "Phi.hatch_t.incr", "Phi.hatch_t.age"))
+saveRDS(phi_step3, here("rds/phi_step3"))
+phi_aictable3 <- model.table(phi_step3, use.lnl=TRUE) 
+saveRDS(phi_aictable3, here("rds/phi_aictable3"))
+
+phi_step3_adj = adjust.chat(1.25, phi_step3)
+model.table(phi_step3_adj, use.lnl=TRUE) 
 
 adjust.chat(1.5, step3)
 adjust.chat(2, step3)
 
 
 
-write.csv(Phi.t_in.cr_hatch_y.s$design.matrix, "C:/Users/Scott/Documents/Classes/FW661/Phi.t_age_hatch_y.s.csv")
-write.csv(Phi.t.in.cr_hatch_y.s$design.matrix, "C:/Users/Scott/Documents/Classes/FW661/Phi.t.in.cr_hatch_y.s.csv")
-write.csv(Phi.cr.mass_T_hatch_y.s$design.matrix, "C:/Users/Scott/Documents/Classes/FW661/Phi.cr.mass_T_hatch_y.s.csv")
-
 
 ##--model averaging for step 3 models- this does real estimates
-step3.mod.av=model.average(step3, "Phi", vcv=TRUE)
+step3.mod.av=model.average(phi_step3, "Phi", vcv=TRUE)
 
 f1213.step3.est=subset(step3.mod.av$estimates[1:48,], select=c("time", "estimate", "se", "lcl", "ucl", "group", "SEASON", "sex"))
 f1314.step3.est=subset(step3.mod.av$estimates[1177:1224,], select=c("time", "estimate", "se", "lcl", "ucl", "group", "SEASON", "sex"))
