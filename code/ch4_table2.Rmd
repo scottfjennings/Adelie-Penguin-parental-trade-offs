@@ -1,0 +1,277 @@
+---
+title: "ch4_table2"
+author: "Scott Jennings"
+date: "Sys.date"
+output: word_document
+---
+
+
+``` {r  echo = FALSE, message = FALSE, error = FALSE, warning = FALSE}
+library(tidyverse)
+library(flextable)
+library(here)
+library(officer)
+```
+
+
+``` {r  echo = FALSE, message = FALSE, error = FALSE, warning = FALSE}
+cr_age_aic1 <- readRDS(here("rds/cr_age_aic1")) %>% 
+  mutate(neg2ll = -2*LL) %>% 
+  select(-AICc, -ModelLik, -LL, -Cum.Wt)%>% 
+  mutate(across(c(Delta_AICc, AICcWt, neg2ll), ~round(., 2)),
+         morph = "") 
+
+cr_age_aic <- readRDS(here("rds/cr_age_aic")) %>% 
+  mutate(neg2ll = -2*LL) %>% 
+  select(-AICc, -ModelLik, -LL, -Cum.Wt)%>% 
+  mutate(across(c(Delta_AICc, AICcWt, neg2ll), ~round(., 2)),
+         morph = "") 
+    
+cr_mass_aic1 <- readRDS(here("rds/cr_mass_aic1")) %>% 
+  mutate(neg2ll = -2*LL) %>% 
+  select(-AICc, -ModelLik, -LL, -Cum.Wt)%>% 
+  mutate(across(c(Delta_AICc, AICcWt, neg2ll), ~round(., 2)),
+         morph = "mass",
+         Modnames = gsub("mass.", "", Modnames))
+
+cr_mass_aic <- readRDS(here("rds/cr_mass_aic")) %>% 
+  mutate(neg2ll = -2*LL) %>% 
+  select(-AICc, -ModelLik, -LL, -Cum.Wt)%>% 
+  mutate(across(c(Delta_AICc, AICcWt, neg2ll), ~round(., 2)),
+         morph = "mass",
+         Modnames = gsub("mass.", "", Modnames)) 
+           
+cr_flip_aic1 <- readRDS(here("rds/cr_flip_aic1")) %>% 
+  mutate(neg2ll = -2*LL) %>% 
+  select(-AICc, -ModelLik, -LL, -Cum.Wt)%>% 
+  mutate(across(c(Delta_AICc, AICcWt, neg2ll), ~round(., 2)),
+         morph = "flip",
+         Modnames = gsub("flip.", "", Modnames))
+
+cr_flip_aic <- readRDS(here("rds/cr_flip_aic")) %>% 
+  mutate(neg2ll = -2*LL) %>% 
+  select(-AICc, -ModelLik, -LL, -Cum.Wt)%>% 
+  mutate(across(c(Delta_AICc, AICcWt, neg2ll), ~round(., 2)),
+         morph = "flip",
+         Modnames = gsub("flip.", "", Modnames)) 
+
+
+cr_tib_aic1 <- readRDS(here("rds/cr_tib_aic1")) %>% 
+  mutate(neg2ll = -2*LL) %>% 
+  select(-AICc, -ModelLik, -LL, -Cum.Wt)%>% 
+  mutate(across(c(Delta_AICc, AICcWt, neg2ll), ~round(., 2)),
+         morph = "tib",
+         Modnames = gsub("tib.", "", Modnames)) 
+
+cr_tib_aic <- readRDS(here("rds/cr_tib_aic")) %>% 
+  mutate(neg2ll = -2*LL) %>% 
+  select(-AICc, -ModelLik, -LL, -Cum.Wt)%>% 
+  mutate(across(c(Delta_AICc, AICcWt, neg2ll), ~round(., 2)),
+         morph = "tib",
+         Modnames = gsub("tib.", "", Modnames)) 
+
+```
+
+``` {r  echo = FALSE, message = FALSE, error = FALSE, warning = FALSE}
+
+tab2 <- rbind(data.frame(morph = "", Modnames = "Creche age step 1", K = "", Delta_AICc = "", AICcWt = "", neg2ll = ""),
+              cr_age_aic1,
+              data.frame(morph = "", Modnames = "Creche age step 2", K = "", Delta_AICc = "", AICcWt = "", neg2ll = ""),
+              cr_age_aic,
+              data.frame(morph = "", Modnames = "Creche mass step 1", K = "", Delta_AICc = "", AICcWt = "", neg2ll = ""),
+              cr_mass_aic1,
+              data.frame(morph = "", Modnames = "Creche mass step 2", K = "", Delta_AICc = "", AICcWt = "", neg2ll = ""),
+              cr_mass_aic,
+              data.frame(morph = "", Modnames = "Creche flipper length step 1", K = "", Delta_AICc = "", AICcWt = "", neg2ll = ""),
+              cr_flip_aic1,
+              data.frame(morph = "", Modnames = "Creche flipper length step 2", K = "", Delta_AICc = "", AICcWt = "", neg2ll = ""),
+              cr_flip_aic,
+              data.frame(morph = "", Modnames = "Creche tibiotarsus length step 1", K = "", Delta_AICc = "", AICcWt = "", neg2ll = ""),
+              cr_tib_aic1,
+              data.frame(morph = "", Modnames = "Creche tibiotarsus length step 2", K = "", Delta_AICc = "", AICcWt = "", neg2ll = ""),
+              cr_tib_aic) 
+
+
+table2 <- tab2 %>% 
+  # step 1 models
+  mutate(model.names = Modnames, 
+         model.names = ifelse(model.names == "sex.year", "sex * year", model.names),
+         model.names = ifelse(model.names == "mass_hatch_year", "mass growth + hatch date + year", model.names), 
+         model.names = ifelse(model.names == "hatch_year", "hatch date + year", model.names), 
+         model.names = ifelse(model.names == "tib_hatch_year", "tibiotarsus growth + hatch date + year", model.names), 
+         model.names = ifelse(model.names == "flip_hatch_year", "flipper growth + hatch date + year", model.names), 
+         model.names = ifelse(model.names == "mass_year", "mass growth + year", model.names), 
+         model.names = ifelse(model.names == "flip_year", "flipper growth + year", model.names), 
+         model.names = ifelse(model.names == "int", "intercept only", model.names), 
+         model.names = ifelse(model.names == "year", "year", model.names), 
+         model.names = ifelse(model.names == "tib_year", "tibiotarsus growth + year", model.names)) %>%  
+  # step 2 models: sex + year
+  mutate(model.names = ifelse(model.names == "age_sex_year", "creche age + sex + year", model.names), 
+         model.names = ifelse(model.names == "age_hatch_sex_year", "creche age + hatch date + sex + year", model.names), 
+         model.names = ifelse(model.names == "hatch_sex_year", "hatch date + sex + year", model.names), 
+         model.names = ifelse(model.names == "sex_year", "sex + year", model.names),
+         model.names = ifelse(model.names == "growth_hatch_sex_year", "growth + hatch date + sex + year", model.names), 
+         model.names = ifelse(model.names == "age_growth_sex_year", "creche age + growth + sex + year", model.names), 
+         model.names = ifelse(model.names == "age_growth_hatch_sex_year", "creche age + growth + hatch date + sex + year", model.names), 
+         model.names = ifelse(model.names == "growth_sex_year", "growth + sex + year", model.names)) %>% 
+  # step 2 models: year only
+  mutate(model.names = ifelse(model.names == "age_year", "creche age + year", model.names), 
+         model.names = ifelse(model.names == "age_hatch_year", "creche age + hatch date + year", model.names), 
+         model.names = ifelse(model.names == "hatch_year", "hatch date + year", model.names), 
+         model.names = ifelse(model.names == "year", "year", model.names),
+         model.names = ifelse(model.names == "growth_hatch_year", "growth + hatch date + year", model.names), 
+         model.names = ifelse(model.names == "age_growth_year", "creche age + growth + year", model.names), 
+         model.names = ifelse(model.names == "age_growth_hatch_year", "creche age + growth + hatch date + year", model.names), 
+         model.names = ifelse(model.names == "growth_year", "growth + year", model.names)) %>% 
+  mutate(model.names = ifelse(morph == "mass", gsub("growth", "mass growth", model.names), model.names),
+         model.names = ifelse(morph == "flip", gsub("growth", "flipper growth", model.names), model.names),
+         model.names = ifelse(morph == "tib", gsub("growth", "tibiotarsus growth", model.names), model.names),
+         model.names = gsub("growth", "growth rate", model.names)) %>% 
+  select(model.names, everything(), -Modnames, -morph)
+
+
+
+```
+Table 2 for chapter 4 of S. Jennings thesis.
+
+```{r echo = FALSE, message = FALSE, error = FALSE, warning = FALSE}
+
+subhead.rows = c(1, 6, 16, 21, 29, 34, 42, 47)
+
+flextable(table2) %>%   
+  set_header_labels(model.names = "Model Structure") %>%
+  set_header_labels(K = "K") %>%
+  set_header_labels(Delta_AICc = "\u0394 AICc") %>% 
+  set_header_labels(AICcWt = "AICc Wt.") %>% 
+  set_header_labels(neg2ll = "-2*log(Likelihood)") %>% 
+  border_remove() %>% 
+  border(i = 1, border.top = fp_border(color = "black"), part = "header") %>% 
+  border(i = subhead.rows, border.top = fp_border(color = "black"), part = "body") %>% 
+  border(i = subhead.rows, border.bottom = fp_border(color = "black"), part = "body") %>%
+  border(i = nrow(table2), border.bottom = fp_border(color = "black"), part = "body") %>% 
+  align_nottext_col(align = "center") %>% 
+  align_text_col(align = "left")  %>%
+  align(j = 3:5, align = "center", part = "all") %>% 
+  autofit() %>% 
+  fit_to_width(max_width = 7.5) %>% 
+  bold(., i = subhead.rows, bold = TRUE, part = "body")
+
+```
+
+
+
+
+```{r echo = FALSE, message = FALSE, error = FALSE, warning = FALSE}
+
+cr_age_best <- readRDS(here("rds/cr_age_best")) %>% 
+  mutate(cr.age = NA) %>%
+  mutate(neg2ll = -2*LL,
+         neg2ll = round(neg2ll, 3),
+         morph = "") %>% 
+  select(morph, Modnames, cr.age, growth, resid.hatch, SEASON1314, K, Delta_AICc, AICcWt,neg2ll, var.expl, -LL)
+
+cr_mass_best <- readRDS(here("rds/cr_mass_best")) %>% 
+  rename(growth = weight.slope40) %>%
+  mutate(neg2ll = -2*LL,
+         neg2ll = round(neg2ll, 3),
+         resid.hatch = NA) %>% 
+  separate(Modnames, into = c("morph", "Modnames"), sep = "\\.") %>% 
+  select(morph, Modnames, cr.age, growth, resid.hatch, SEASON1314, K, Delta_AICc, AICcWt,neg2ll, var.expl, -LL)
+
+cr_flip_best <- readRDS(here("rds/cr_flip_best")) %>% 
+  rename(growth = flipper.slope40) %>%
+  mutate(neg2ll = -2*LL,
+         neg2ll = round(neg2ll, 3),
+         resid.hatch = NA)  %>% 
+  separate(Modnames, into = c("morph", "Modnames"), sep = "\\.") %>% 
+  select(morph, Modnames, cr.age, growth, resid.hatch, SEASON1314, K, Delta_AICc, AICcWt,neg2ll, var.expl, -LL)
+
+cr_tib_best <- readRDS(here("rds/cr_tib_best")) %>% 
+  mutate(growth = NA) %>%
+  mutate(neg2ll = -2*LL,
+         neg2ll = round(neg2ll, 3),
+         resid.hatch = NA)  %>% 
+  separate(Modnames, into = c("morph", "Modnames"), sep = "\\.") %>% 
+  select(morph, Modnames, cr.age, growth, resid.hatch, SEASON1314, K, Delta_AICc, AICcWt,neg2ll, var.expl, -LL)
+```
+
+
+```{r echo = FALSE, message = FALSE, error = FALSE, warning = FALSE}
+
+tab2b <- rbind(data.frame(morph = "", Modnames = "Creche age", cr.age = "", growth = "", resid.hatch = "", SEASON1314 = "", K = "", Delta_AICc = "", AICcWt = "", neg2ll = "", var.expl = ""),
+              cr_age_best,
+              data.frame(morph = "", Modnames = "Creche mass", cr.age = "", growth = "", resid.hatch = "", SEASON1314 = "", K = "", Delta_AICc = "", AICcWt = "", neg2ll = "", var.expl = ""),
+              cr_mass_best,
+              data.frame(morph = "", Modnames = "Creche flipper length", cr.age = "", growth = "", resid.hatch = "", SEASON1314 = "", K = "", Delta_AICc = "", AICcWt = "", neg2ll = "", var.expl = ""),
+              cr_flip_best,
+              data.frame(morph = "", Modnames = "Creche tibiotarsus length", cr.age = "", growth = "", resid.hatch = "", SEASON1314 = "", K = "", Delta_AICc = "", AICcWt = "", neg2ll = "", var.expl = ""),
+              cr_tib_best) 
+
+
+
+table2b <- tab2b %>% 
+  mutate(model.names = Modnames, 
+         model.names = ifelse(model.names == "mass_hatch_year", "mass growth + hatch date + year", model.names), 
+         model.names = ifelse(model.names == "hatch_year", "hatch date + year", model.names), 
+         model.names = ifelse(model.names == "tib_hatch_year", "tibiotarsus growth + hatch date + year", model.names), 
+         model.names = ifelse(model.names == "flip_hatch_year", "flipper growth + hatch date + year", model.names), 
+         model.names = ifelse(model.names == "mass_year", "mass growth + year", model.names), 
+         model.names = ifelse(model.names == "flip_year", "flipper growth + year", model.names), 
+         model.names = ifelse(model.names == "int", "intercept only", model.names), 
+         model.names = ifelse(model.names == "year", "year", model.names), 
+         model.names = ifelse(model.names == "tib_year", "tibiotarsus growth + year", model.names),  
+         model.names = ifelse(model.names == "age_sex_year", "creche age + sex + year", model.names), 
+         model.names = ifelse(model.names == "age_hatch_sex_year", "creche age + hatch date + sex + year", model.names), 
+         model.names = ifelse(model.names == "hatch_sex_year", "hatch date + sex + year", model.names), 
+         model.names = ifelse(model.names == "sex_year", "sex + year", model.names),
+         model.names = ifelse(model.names == "growth_hatch_sex_year", "growth + hatch date + sex + year", model.names), 
+         model.names = ifelse(model.names == "age_growth_sex_year", "creche age + growth + sex + year", model.names), 
+         model.names = ifelse(model.names == "age_growth_hatch_sex_year", "creche age + growth + hatch date + sex + year", model.names), 
+         model.names = ifelse(model.names == "growth_sex_year", "growth + sex + year", model.names)) %>% 
+  mutate(model.names = ifelse(morph == "mass", gsub("growth", "mass growth", model.names), model.names),
+         model.names = ifelse(morph == "flip", gsub("growth", "flipper growth", model.names), model.names),
+         model.names = ifelse(morph == "tib", gsub("growth", "tibiotarsus growth", model.names), model.names),
+         model.names = gsub("growth", "growth rate", model.names)) %>% 
+  select(model.names, everything(), -Modnames, -morph)
+
+
+```
+
+Table 2b for chapter 4 of S. Jennings thesis. This may end up being the main text table (table 2 might be appendix)
+
+```{r echo = FALSE, message = FALSE, error = FALSE, warning = FALSE}
+
+flextable(table2b) %>%   
+  set_header_labels(model.names = "Model Structure") %>%
+  set_header_labels(cr.age = "creching age") %>%
+  set_header_labels(growth = "growth rate") %>%
+  set_header_labels(resid.hatch = "hatch date") %>%
+  set_header_labels(SEASON1314 = "year") %>%
+  set_header_labels(K = "K") %>%
+  set_header_labels(Delta_AICc = "\u0394 AICc") %>% 
+  set_header_labels(AICcWt = "AICc Wt.") %>% 
+  set_header_labels(neg2ll = "-2*log(Likelihood)") %>% 
+  set_header_labels(var.expl = "% variance explained") %>%
+  border_remove() %>% 
+  border(i = 1, border.top = fp_border(color = "black"), part = "header") %>% 
+  border(i = 1, border.top = fp_border(color = "black"), part = "body") %>% 
+  border(i = 1, border.bottom = fp_border(color = "black"), part = "body") %>%
+  border(i = 6, border.top = fp_border(color = "black"), part = "body") %>% 
+  border(i = 6, border.bottom = fp_border(color = "black"), part = "body") %>%
+  border(i = 8, border.top = fp_border(color = "black"), part = "body") %>% 
+  border(i = 8, border.bottom = fp_border(color = "black"), part = "body") %>%
+  border(i = 10, border.top = fp_border(color = "black"), part = "body") %>% 
+  border(i = 10, border.bottom = fp_border(color = "black"), part = "body") %>% 
+  border(i = nrow(table2b), border.bottom = fp_border(color = "black"), part = "body") %>% 
+  align_nottext_col(align = "center") %>% 
+  align_text_col(align = "left")  %>%
+  align(j = 3:10, align = "center", part = "all") %>% 
+  autofit() %>% 
+  fit_to_width(max_width = 8.5) %>% 
+  bold(., i = 1, bold = TRUE, part = "body")  %>% 
+  bold(., i = 6, bold = TRUE, part = "body")  %>% 
+  bold(., i = 8, bold = TRUE, part = "body")  %>% 
+  bold(., i = 10, bold = TRUE, part = "body") 
+
+```
+

@@ -1,0 +1,220 @@
+---
+title: "CH 4 Model Selction tables"
+output: word_document
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = FALSE,
+                      message = FALSE,
+                      warning = FALSE)
+```
+
+
+```{r}
+library(tidyverse)
+library(flextable)
+library(here)
+library(RMark)
+
+```
+
+
+
+```{r}
+
+fix_mod_names <- function(mod.table) {
+  mod.table <- mod.table %>% 
+    mutate(mod.name = gsub("~", "", mod.name),
+           #mod.name = gsub("\\(", "", mod.name),
+           #mod.name = gsub("\\)", "", mod.name),
+           mod.name = gsub("SEASON", "Year", mod.name),
+           mod.name = gsub("sex", "Sex", mod.name),
+           mod.name = gsub("Time + I(Time^2)", "TT", mod.name, fixed = TRUE),
+           mod.name = gsub("log(Time + 1)", "lnT", mod.name, fixed = TRUE),
+           mod.name = gsub("Time", "T", mod.name),
+           mod.name = gsub("time", "t", mod.name),
+           mod.name = gsub("in.cr", "Creched", mod.name),
+           mod.name = gsub("res.htch + I(res.htch^2)", "Hatch2", mod.name, fixed = TRUE),
+           mod.name = gsub("res.htch", "Hatch", mod.name),
+           mod.name = gsub("1", "Intercept only", mod.name),
+           mod.name = gsub("weight", "Mass growth", mod.name),
+           mod.name = gsub("tibiotar", "Tibiotarsus growth", mod.name),
+           mod.name = gsub("flipper", "Flipper growth", mod.name),
+           mod.name = gsub("did.cr", "Creched", mod.name),
+           mod.name = gsub("cr.mass", "Creching mass", mod.name),
+           mod.name = gsub("cr.flip", "Creching flipper", mod.name),
+           mod.name = gsub("cr.tib", "Creching tibiotarsus", mod.name),
+           mod.name = gsub("fate.age", "Creching age", mod.name),
+           mod.name = gsub("dayold", "Age", mod.name))
+  
+}
+
+
+```
+
+Table S1. Model selection results for determining the best model structure for estimating resighting probabilities of Adélie Penguin chicks during the entire chick-provisioning period at Cape Crozier, Ross Island, Antarctica, 2012-2013. 
+
+```{r}
+
+
+p_modtable <- readRDS(here("fitted_models/p_mod_list")) %>% 
+  model.table(use.lnl=TRUE) 
+
+
+saturated_phi = distinct(p_modtable, Phi) %>% 
+  rename(mod.name = Phi) %>% 
+  fix_mod_names()
+
+p_modtable %>% 
+  select(mod.name = p, npar, DeltaQAICc, weight, Neg2LnL) %>% 
+  mutate(DeltaQAICc = round(DeltaQAICc, 3),
+         weight = round(weight, 3),
+         Neg2LnL = round(Neg2LnL, 3)) %>% 
+  fix_mod_names() %>% 
+  flextable() %>% 
+  set_header_labels(mod.name = "p model structure",
+                    npar = "K",
+                    DeltaQAICc = "\u0394 QAICc",
+                    weight = "QAICc wt",
+                    Neg2LnL = "-2lnL") %>% 
+  align(j = 2:5, align = "center", part = "all") %>% 
+  autofit() %>% 
+  footnote(i = 1, j = 1, part = "header", value = as_paragraph(paste("\u03D5 structure =", saturated_phi[[1]])))
+
+```
+<br>
+
+Table S2. Model selection results for the first step in determining the best model structure for estimating survival probabilities of Adélie Penguin chicks at Cape Crozier, Ross Island, Antarctica, 2012-2013. The candidate set in this stage of model selection included model structures to evaluate the relative importance of Year, Sex and relative Hatch date in explaining survival across the entire chick-provisioning period.
+
+```{r}
+
+
+phi_step1_modtable <- readRDS(here("fitted_models/phi_step1")) %>% 
+  model.table(use.lnl=TRUE) 
+
+
+p_stru = distinct(phi_step1_modtable, p) %>% 
+  rename(mod.name = p) %>% 
+  fix_mod_names()
+
+phi_step1_modtable %>% 
+  select(mod.name = Phi, npar, DeltaQAICc, weight, Neg2LnL) %>% 
+  mutate(DeltaQAICc = round(DeltaQAICc, 3),
+         weight = round(weight, 3),
+         Neg2LnL = round(Neg2LnL, 3)) %>% 
+  fix_mod_names() %>% 
+  flextable() %>% 
+  set_header_labels(mod.name = "\u03D5 model structure",
+                    npar = "K",
+                    DeltaQAICc = "\u0394 QAICc",
+                    weight = "QAICc wt",
+                    Neg2LnL = "-2lnL") %>% 
+  align(j = 2:5, align = "center", part = "all") %>% 
+  autofit() %>% 
+  footnote(i = 1, j = 1, part = "header", value = as_paragraph(paste("p structure =", p_stru[[1]])))
+
+```
+
+<br>
+
+Table S3. Model selection results for the second step in determining the best model structure for estimating survival probabilities of Adélie Penguin chicks during the entire chick-provisioning period at Cape Crozier, Ross Island, Antarctica, 2012-2013. The candidate set in this stage of model selection included the competitive model structures from the first step (Δ QAICc ≤ 2; see Table S2), and added structures to evaluate time effects on survival across the entire chick-provisioning period.
+
+```{r}
+
+
+phi_step2_modtable <- readRDS(here("fitted_models/phi_step2"))%>% 
+  model.table(use.lnl=TRUE) 
+
+
+p_stru = distinct(phi_step2_modtable, p) %>% 
+  rename(mod.name = p) %>% 
+  fix_mod_names()
+
+phi_step2_modtable %>% 
+  select(mod.name = Phi, npar, DeltaQAICc, weight, Neg2LnL) %>% 
+  mutate(DeltaQAICc = round(DeltaQAICc, 3),
+         weight = round(weight, 3),
+         Neg2LnL = round(Neg2LnL, 3)) %>% 
+  fix_mod_names() %>% 
+  flextable() %>% 
+  set_header_labels(mod.name = "\u03D5 model structure",
+                    npar = "K",
+                    DeltaQAICc = "\u0394 QAICc",
+                    weight = "QAICc wt",
+                    Neg2LnL = "-2lnL") %>% 
+  align(j = 2:5, align = "center", part = "all") %>% 
+  autofit() %>% 
+  footnote(i = 1, j = 1, part = "header", value = as_paragraph(paste("p structure =", p_stru[[1]])))
+
+```
+
+
+
+<br>
+
+Table S4. Model selection results for determining the the ability of growth rates to explain estimated survival probabilities of Adélie Penguin chicks during the entire chick-provisioning period at Cape Crozier, Ross Island, Antarctica, 2012-2013. The candidate set in this stage of model selection included the best-supported model structure from the second step of estimating survival across entire chick-provisioning period (see Table S3).
+
+```{r}
+
+
+
+growth_surv_modtable <- readRDS(here("fitted_models/growth_surv_models")) %>% 
+  model.table(use.lnl=TRUE) 
+
+
+p_stru = distinct(growth_surv_modtable, p) %>% 
+  rename(mod.name = p) %>% 
+  fix_mod_names()
+
+growth_surv_modtable %>% 
+  select(mod.name = Phi, npar, DeltaQAICc, weight, Neg2LnL) %>% 
+  mutate(DeltaQAICc = round(DeltaQAICc, 3),
+         weight = round(weight, 3),
+         Neg2LnL = round(Neg2LnL, 3)) %>% 
+  fix_mod_names() %>% 
+  flextable() %>% 
+  set_header_labels(mod.name = "\u03D5 model structure",
+                    npar = "K",
+                    DeltaQAICc = "\u0394 QAICc",
+                    weight = "QAICc wt",
+                    Neg2LnL = "-2lnL") %>% 
+  align(j = 2:5, align = "center", part = "all") %>% 
+  autofit() %>% 
+  footnote(i = 1, j = 1, part = "header", value = as_paragraph(paste("p structure =", p_stru[[1]])))
+
+```
+
+
+
+<br>
+
+Table S5. Model selection results for determining the the ability of creching age or size to explain estimated survival probabilities of Adélie Penguin chicks during the entire chick-provisioning period at Cape Crozier, Ross Island, Antarctica, 2012-2013. The candidate set in this stage of model selection included the best-supported model structure from the second step of estimating survival across entire chick-provisioning period (see Table S3) and from determining the ability of growth rates to explain survival (see Table S4).
+
+```{r}
+
+
+cr_age_size_modtable <- readRDS(here("fitted_models/cr_age_size_models")) %>% 
+  model.table(use.lnl=TRUE) 
+
+
+p_stru = distinct(cr_age_size_modtable, p) %>% 
+  rename(mod.name = p) %>% 
+  fix_mod_names()
+
+cr_age_size_modtable %>% 
+  select(mod.name = Phi, npar, DeltaQAICc, weight, Neg2LnL) %>% 
+  mutate(DeltaQAICc = round(DeltaQAICc, 3),
+         weight = round(weight, 3),
+         Neg2LnL = round(Neg2LnL, 3)) %>% 
+  fix_mod_names() %>% 
+  flextable() %>% 
+  set_header_labels(mod.name = "\u03D5 model structure",
+                    npar = "K",
+                    DeltaQAICc = "\u0394 QAICc",
+                    weight = "QAICc wt",
+                    Neg2LnL = "-2lnL") %>% 
+  align(j = 2:5, align = "center", part = "all") %>% 
+  autofit() %>% 
+  footnote(i = 1, j = 1, part = "header", value = as_paragraph(paste("p structure =", p_stru[[1]])))
+
+```
