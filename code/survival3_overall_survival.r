@@ -83,7 +83,7 @@ peng.p=collect.models(p_mod_names)
 
 saveRDS(peng.p, here("fitted_models/p_mod_list"))
 
-# peng.p <- readRDS(here("fitted_models/p_mod_list"))
+# peng.p2 <- readRDS(here("fitted_models/p_mod_list"))
 
 
 	
@@ -168,7 +168,9 @@ phi_step1=collect.models(lx=c("Phi.SEASON.sex", "Phi.SEASON_sex", "Phi.SEASON", 
                           "Phi.Sex_hatch", "Phi.Sex.hatch", "Phi.Sex_hatch2",
                           "Phi.hatch", "Phi.hatch2",
                           "Phi.dot"))
+
 saveRDS(phi_step1, here("fitted_models/phi_step1"))
+phi_step1_2 <- readRDS(here("fitted_models/phi_step1"))
 
 
 # phi_aictable1 <- model.table(phi_step1, use.lnl=TRUE) 
@@ -180,7 +182,7 @@ saveRDS(phi_step1, here("fitted_models/phi_step1"))
 #inc r =time-varying for in cr or not on specific day
 #dayold = time-varying for age on specific day;
 
-# considering 4 structures from step 2, those with DAIC <= 2, (would be 3 structures using models with model weight >= 0.1):
+# considering 3 structures from step 2, those with DAIC <= 2, (would be 3 structures using models with model weight >= 0.1):
 
 # ~ SEASON + res.htch - step 1 DAICc = 0
 Phi.SEASON_hatch = run.phi.model(list(formula = ~ SEASON + res.htch))
@@ -193,7 +195,7 @@ Phi.SEASON_hatch_t_age = run.phi.model(list(formula = ~ SEASON + res.htch + time
 Phi.SEASON_hatch_t.incr = run.phi.model(list(formula = ~ SEASON + res.htch + time:in.cr))		#same slope, diff intercept for in.cr
 Phi.SEASON_hatch_t.age = run.phi.model(list(formula = ~ SEASON + res.htch + time:dayold))		#8	same slope, diff intercept for dayold
 
-# ~ SEASON * sex + res.htch- step 1 DAIC = 0.458
+# ~ SEASON * sex + res.htch- step 1 DAIC = 1.126095
 Phi.SEASON.sex_hatch = run.phi.model(list(formula = ~ SEASON * sex + res.htch))
 Phi.SEASON.sex_hatch_t = run.phi.model(list(formula = ~ SEASON * sex + res.htch + time))	
 Phi.SEASON.sex_hatch_T = run.phi.model(list(formula = ~ SEASON * sex + res.htch + Time))
@@ -204,40 +206,29 @@ Phi.SEASON.sex_hatch_t_age = run.phi.model(list(formula = ~ SEASON * sex + res.h
 Phi.SEASON.sex_hatch_t.incr = run.phi.model(list(formula = ~ SEASON * sex + res.htch + time:in.cr))		#same slope, diff intercept for in.cr
 Phi.SEASON.sex_hatch_t.age = run.phi.model(list(formula = ~ SEASON * sex + res.htch + time:dayold))		#8	same slope, diff intercept for dayold
 	
-# ~res.htch - step 1 DAIC = 1.384
-Phi.hatch = run.phi.model(list(formula = ~res.htch))
-Phi.hatch_t = run.phi.model(list(formula = ~ res.htch + time))	
-Phi.hatch_T = run.phi.model(list(formula = ~ res.htch + Time))
-Phi.hatch_TT = run.phi.model(list(formula = ~res.htch + Time + I(Time^2)))
-Phi.hatch_lnT = run.phi.model(list(formula = ~ res.htch + log(Time+1)))
-Phi.hatch_t_incr = run.phi.model(list(formula = ~ res.htch + time + in.cr))		#5	#same intercept, diff slope for in.cr
-Phi.hatch_t_age = run.phi.model(list(formula = ~ res.htch + time + dayold))		#6	same intercept, diff slope for dayold
-Phi.hatch_t.incr = run.phi.model(list(formula = ~ res.htch + time:in.cr))		#same slope, diff intercept for in.cr
-Phi.hatch_t.age = run.phi.model(list(formula = ~ res.htch + time:dayold))
+# ~SEASON * res.htch - step 1 DAIC = 1.984
+Phi.SEASON.hatch = run.phi.model(list(formula = ~SEASON * res.htch))
+Phi.SEASON.hatch_t = run.phi.model(list(formula = ~ SEASON * res.htch + time))	
+Phi.SEASON.hatch_T = run.phi.model(list(formula = ~ SEASON * res.htch + Time))
+Phi.SEASON.hatch_TT = run.phi.model(list(formula = ~ SEASON * res.htch + Time + I(Time^2)))
+Phi.SEASON.hatch_lnT = run.phi.model(list(formula = ~ SEASON * res.htch + log(Time+1)))
+Phi.SEASON.hatch_t_incr = run.phi.model(list(formula = ~ SEASON * res.htch + time + in.cr))		#5	#same intercept, diff slope for in.cr
+Phi.SEASON.hatch_t_age = run.phi.model(list(formula = ~ SEASON * res.htch + time + dayold))		#6	same intercept, diff slope for dayold
+Phi.SEASON.hatch_t.incr = run.phi.model(list(formula = ~ SEASON * res.htch + time:in.cr))		#same slope, diff intercept for in.cr
+Phi.SEASON.hatch_t.age = run.phi.model(list(formula = ~ SEASON * res.htch + time:dayold))
 
-# SEASON + sex + res.htch - step 1 DAIC = 1.987
-Phi.SEASON_sex_hatch = run.phi.model(list(formula = ~ SEASON + sex + res.htch))
-Phi.SEASON_sex_hatch_t = run.phi.model(list(formula = ~ SEASON + sex + res.htch + time))	
-Phi.SEASON_sex_hatch_T = run.phi.model(list(formula = ~ SEASON + sex + res.htch + Time))
-Phi.SEASON_sex_hatch_TT = run.phi.model(list(formula = ~ SEASON + sex + res.htch + Time + I(Time^2)))
-Phi.SEASON_sex_hatch_lnT = run.phi.model(list(formula = ~ SEASON + sex + res.htch + log(Time+1)))
-Phi.SEASON_sex_hatch_t_incr = run.phi.model(list(formula = ~ SEASON + sex + res.htch + time + in.cr))		#5	#same intercept, diff slope for in.cr
-Phi.SEASON_sex_hatch_t_age = run.phi.model(list(formula = ~ SEASON + sex + res.htch + time + dayold))		#6	same intercept, diff slope for dayold
-Phi.SEASON_sex_hatch_t.incr = run.phi.model(list(formula = ~ SEASON + sex + res.htch + time:in.cr))		#same slope, diff intercept for in.cr
-Phi.SEASON_sex_hatch_t.age = run.phi.model(list(formula = ~ SEASON + sex + res.htch + time:dayold))
+
 
 phi_step2=collect.models(lx=c("Phi.SEASON_hatch", "Phi.SEASON_hatch_t", "Phi.SEASON_hatch_T", "Phi.SEASON_hatch_TT", "Phi.SEASON_hatch_lnT", "Phi.SEASON_hatch_t_incr", "Phi.SEASON_hatch_t_age", "Phi.SEASON_hatch_t.incr", "Phi.SEASON_hatch_t.age",
                               #
                               "Phi.SEASON.sex_hatch", "Phi.SEASON.sex_hatch_t", "Phi.SEASON.sex_hatch_T", "Phi.SEASON.sex_hatch_TT", "Phi.SEASON.sex_hatch_lnT", "Phi.SEASON.sex_hatch_t_incr", "Phi.SEASON.sex_hatch_t_age", "Phi.SEASON.sex_hatch_t.incr", "Phi.SEASON.sex_hatch_t.age",
                               #
-                              "Phi.hatch", "Phi.hatch_t", "Phi.hatch_T", "Phi.hatch_TT", "Phi.hatch_lnT", "Phi.hatch_t_incr", "Phi.hatch_t_age", "Phi.hatch_t.incr", "Phi.hatch_t.age",
-                              #
-                              "Phi.SEASON_sex_hatch", "Phi.SEASON_sex_hatch_t", "Phi.SEASON_sex_hatch_T", "Phi.SEASON_sex_hatch_TT", "Phi.SEASON_sex_hatch_lnT", "Phi.SEASON_sex_hatch_t_incr", "Phi.SEASON_sex_hatch_t_age", "Phi.SEASON_sex_hatch_t.incr", "Phi.SEASON_sex_hatch_t.age"))
+                              "Phi.SEASON.hatch", "Phi.SEASON.hatch_t", "Phi.SEASON.hatch_T", "Phi.SEASON.hatch_TT", "Phi.SEASON.hatch_lnT", "Phi.SEASON.hatch_t_incr", "Phi.SEASON.hatch_t_age", "Phi.SEASON.hatch_t.incr", "Phi.SEASON.hatch_t.age"))
 
 
 
 
-saveRDS(phi_step2, here("fitted_models/phi_step2"))
+saveRDS(phi_step2, here("fitted_models/phi_step2_neo"))
 
 phi_step2 <- readRDS(here("fitted_models/phi_step2"))
 

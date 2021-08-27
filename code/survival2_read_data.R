@@ -54,16 +54,15 @@ penguins=convert.inp(here("data/mark_in.inp"),
 					 "in.cr73", "in.cr74", "in.cr75", "in.cr76", "in.cr77", "in.cr78", "in.cr79", "in.cr80",
 					 "in.cr81", "in.cr82", "in.cr83", "in.cr84", "in.cr85", "in.cr86", "in.cr87", "in.cr88", 
 					 "in.cr89", "in.cr90", "in.cr91", "in.cr92", "in.cr93", "in.cr94", "in.cr95", "in.cr96",
-					 "in.cr97", "in.cr98", "cr.age", "fail.age", "cr.mass", "resid.hatch", "cr.flip", "cr.tib"), use.comments = TRUE) 
+					 "in.cr97", "in.cr98", "cr.age", "fail.age", "cr.mass", "res.htch", "cr.flip", "cr.tib"), use.comments = TRUE) 
 
 
 		 
 ##	setting NA values to mean of that field					
-
-penguins$cr.mass[is.na(penguins$cr.mass)]=1357.6				
-penguins$cr.tib[is.na(penguins$cr.tib)]=111.5				
-penguins$cr.flip[is.na(penguins$cr.flip)]=114.13				
-penguins$mean.N[is.na(penguins$mean.N)]=10.76
+# These are only missing for chicks that didn't creche; pretty sure this not needed. commenting out, if no problems running analysis then can delete 
+# penguins$cr.mass[is.na(penguins$cr.mass)]=1357.6				
+# penguins$cr.tib[is.na(penguins$cr.tib)]=111.5				
+# penguins$cr.flip[is.na(penguins$cr.flip)]=114.13				
 
 ##	actually need cr.age for chicks that didn't cr set to something other than 99
 ##	trying mean cr.age now (calculated after taking out 99's)
@@ -73,9 +72,9 @@ penguins$mean.N[is.na(penguins$mean.N)]=10.76
 
 #write.csv(penguins, "resighting_survival/temp_penguins.csv")
 
-penguins$never.cr=1-penguins$did.cr
-penguins$did.cr=as.numeric(penguins$did.cr)
-penguins$never.cr=as.numeric(penguins$never.cr)
+#penguins$never.cr=1-penguins$did.cr
+#penguins$did.cr=as.numeric(penguins$did.cr)
+#penguins$never.cr=as.numeric(penguins$never.cr)
 
 
 # Next create the processed dataframe and the design data. We’ll use a group 
