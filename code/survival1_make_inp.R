@@ -49,9 +49,11 @@ indiv_covs <- ana_table %>%
          f1213 = ifelse(SEASON == 1213 & sex == "F", 1, 0),
          m1314 = ifelse(SEASON == 1314 & sex == "M", 1, 0),
          f1314 = ifelse(SEASON == 1314 & sex == "F", 1, 0)) %>% 
-  select(chick_id, m1213, f1213, m1314, f1314, ages, cr.age, fail.age, cr.mass, 
-					resid.hatch, cr.flip, cr.tib, fail.age) %>% 
+  select(chick_id, m1213, f1213, m1314, f1314, ages, resid.hatch, cr.age, fail.age, mass.gr = weight.slope40, tib.gr = tibiotar.slope35, flip.gr = flipper.slope40, cr.mass, cr.flip, cr.tib, fail.age) %>% 
   mutate(resid.hatch = round(resid.hatch, 1),
+         mass.gr = round(mass.gr, 2),
+         tib.gr = round(tib.gr, 2),
+         flip.gr = round(flip.gr, 2),
          cr.mass = round(cr.mass, 2),
          cr.flip = round(cr.flip, 2),
          cr.tib = round(cr.tib, 2)) %>% 
