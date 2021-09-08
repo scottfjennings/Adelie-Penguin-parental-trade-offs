@@ -20,11 +20,30 @@ library(ftExtra)
 library(officer)
 ```
 
+```{r}
+get_coef_ci <- function(zmod, zmod.name) {
+zmod_coefCI <- cbind(coef(zmod), confint(zmod)) %>% 
+  data.frame() %>% 
+  rename(est = 1, lci = 2, uci = 3) %>% 
+  rownames_to_column("varb") %>% 
+  mutate(mod = zmod.name) %>% 
+  mutate(varb = ifelse(varb %in% c("weight.slope40", "tibiotar.slope35", "flipper.slope40"), "growth", varb)) %>% 
+  filter(varb != "(Intercept)") %>% 
+  mutate(across(c(est, lci, uci), ~format(round(., 2), nsmall = 2))) %>% 
+  mutate(across(c(est, lci, uci), ~trimws(.))) %>% 
+  mutate(coef.ci = paste(est, " (", lci, "; ", uci, ")", sep = "")) %>% 
+  select(mod, varb, coef.ci) %>% 
+  pivot_wider(id_cols = mod, names_from = varb, values_from = coef.ci) %>% 
+  mutate(adj.r2 = summary(zmod)$adj.r.squared,
+         adj.r2 = format(round(adj.r2, 2), nsmall = 2))
+}
+```
+
 
 
 ```{r }
 # creching age output from best models ----
-cr_age_step2_mods <- readRDS(here("fitted_models/cr_age_step2_mods"))
+cr_age_step2_mods <- readRDS(here("fitted_models/cr_timing/cr_age_step2_mods"))
 
 cr_age_mod_tab <- aictab(cr_age_step2_mods, names(cr_age_step2_mods)) %>% 
   data.frame() %>% 
@@ -39,23 +58,12 @@ cr_age_next_best <- cr_age_mod_tab %>%
 
 
 # coefficients, R2
+
 get_cr_age_coefCI_lm <- function(zmod.name) {
   zmod <- cr_age_step2_mods[zmod.name][[1]]
-zmod_coefCI <- cbind(coef(zmod), confint(zmod)) %>% 
-  data.frame() %>% 
-  rename(est = 1, lci = 2, uci = 3) %>% 
-  rownames_to_column("varb") %>% 
-  mutate(mod = zmod.name) %>% 
-  mutate(varb = ifelse(varb %in% c("weight.slope40", "tibiotar.slope35", "flipper.slope40"), "growth", varb))%>% 
-  filter(varb != "(Intercept)") %>% 
-  mutate(across(c(est, lci, uci), ~format(round(., 2), nsmall = 2))) %>% 
-  mutate(coef.ci = paste(est, " (", lci, " to ", uci, ")", sep = "")) %>% 
-  select(mod, varb, coef.ci) %>% 
-  pivot_wider(id_cols = mod, names_from = varb, values_from = coef.ci) %>% 
-  mutate(adj.r2 = summary(zmod)$adj.r.squared,
-         adj.r2 = format(round(adj.r2, 2), nsmall = 2))
-
+zmod_coefCI <- get_coef_ci(zmod, zmod.name)
 }
+
 
 cr_age_coefCI <- map_df(cr_age_best_mods$Modnames, get_cr_age_coefCI_lm) %>%
   rename(Modnames = mod) %>% 
@@ -106,7 +114,7 @@ flextable(cr_age_coefCI) %>%
 
 ```{r}
 
-cr_mass_step2_mods <- readRDS(here("fitted_models/cr_mass_step2_mods"))
+cr_mass_step2_mods <- readRDS(here("fitted_models/cr_timing/cr_mass_step2_mods"))
 
 cr_mass_mod_tab <- aictab(cr_mass_step2_mods, names(cr_mass_step2_mods)) %>% 
   data.frame() %>% 
@@ -123,26 +131,14 @@ cr_mass_next_best <- cr_mass_mod_tab %>%
 # coefficients, R2
 get_cr_mass_coefCI_lm <- function(zmod.name) {
   zmod <- cr_mass_step2_mods[zmod.name][[1]]
-zmod_coefCI <- cbind(coef(zmod), confint(zmod)) %>% 
-  data.frame() %>% 
-  rename(est = 1, lci = 2, uci = 3) %>% 
-  rownames_to_column("varb") %>% 
-  mutate(mod = zmod.name) %>% 
-  filter(varb != "(Intercept)") %>% 
-  mutate(across(c(est, lci, uci), ~format(round(., 2), nsmall = 2))) %>% 
-  mutate(coef.ci = paste(est, " (", lci, " to ", uci, ")", sep = "")) %>% 
-  select(mod, varb, coef.ci) %>% 
-  pivot_wider(id_cols = mod, names_from = varb, values_from = coef.ci) %>% 
-  mutate(adj.r2 = summary(zmod)$adj.r.squared,
-         adj.r2 = format(round(adj.r2, 2), nsmall = 2))
-
+zmod_coefCI <- get_coef_ci(zmod, zmod.name)
 }
 
 cr_mass_coefCI <- map_df(cr_mass_best_mods$Modnames, get_cr_mass_coefCI_lm) %>%
   rename(Modnames = mod) %>% 
   full_join(cr_mass_best_mods) %>% 
   arrange(Delta_AICc) %>% 
-  dplyr::select(Modnames, cr.age, growth = weight.slope40, sexM, SEASON1314, Delta_AICc, adj.r2) %>% 
+  dplyr::select(Modnames, cr.age, growth, sexM, SEASON1314, Delta_AICc, adj.r2) %>% 
   mutate(Modnames = gsub("_", " + ", Modnames),
          Modnames = gsub("hatch", "hatch date", Modnames),
          Modnames = gsub("mass.", "", Modnames),
@@ -156,7 +152,7 @@ cr_mass_coefCI <- map_df(cr_mass_best_mods$Modnames, get_cr_mass_coefCI_lm) %>%
 
 ```{r}
 
-cr_flip_step2_mods <- readRDS(here("fitted_models/cr_flip_step2_mods"))
+cr_flip_step2_mods <- readRDS(here("fitted_models/cr_timing/cr_flip_step2_mods"))
 
 cr_flip_mod_tab <- aictab(cr_flip_step2_mods, names(cr_flip_step2_mods)) %>% 
   data.frame() %>% 
@@ -173,18 +169,7 @@ cr_flip_next_best <- cr_flip_mod_tab %>%
 # coefficients, R2
 get_cr_flip_coefCI_lm <- function(zmod.name) {
   zmod <- cr_flip_step2_mods[zmod.name][[1]]
-zmod_coefCI <- cbind(coef(zmod), confint(zmod)) %>% 
-  data.frame() %>% 
-  rename(est = 1, lci = 2, uci = 3) %>% 
-  rownames_to_column("varb") %>% 
-  mutate(mod = zmod.name) %>% 
-  filter(varb != "(Intercept)") %>% 
-  mutate(across(c(est, lci, uci), ~format(round(., 2), nsmall = 2))) %>% 
-  mutate(coef.ci = paste(est, " (", lci, " to ", uci, ")", sep = "")) %>% 
-  select(mod, varb, coef.ci) %>% 
-  pivot_wider(id_cols = mod, names_from = varb, values_from = coef.ci) %>% 
-  mutate(adj.r2 = summary(zmod)$adj.r.squared,
-         adj.r2 = format(round(adj.r2, 2), nsmall = 2))
+zmod_coefCI <- get_coef_ci(zmod, zmod.name)
 
 }
 
@@ -192,7 +177,7 @@ cr_flip_coefCI <- map_df(cr_flip_best_mods$Modnames, get_cr_flip_coefCI_lm) %>%
   rename(Modnames = mod) %>% 
   full_join(cr_flip_best_mods) %>% 
   arrange(Delta_AICc) %>% 
-  dplyr::select(Modnames, cr.age, growth = flipper.slope40, SEASON1314, Delta_AICc, adj.r2) %>% 
+  dplyr::select(Modnames, cr.age, growth, SEASON1314, Delta_AICc, adj.r2) %>% 
   mutate(Modnames = gsub("_", " + ", Modnames),
          Modnames = gsub("hatch", "hatch date", Modnames),
          Modnames = gsub("flip.", "", Modnames),
@@ -204,7 +189,7 @@ cr_flip_coefCI <- map_df(cr_flip_best_mods$Modnames, get_cr_flip_coefCI_lm) %>%
 
 ```{r}
 
-cr_tib_step2_mods <- readRDS(here("fitted_models/cr_tib_step2_mods"))
+cr_tib_step2_mods <- readRDS(here("fitted_models/cr_timing/cr_tib_step2_mods"))
 
 cr_tib_mod_tab <- aictab(cr_tib_step2_mods, names(cr_tib_step2_mods)) %>% 
   data.frame() %>% 
@@ -221,26 +206,14 @@ cr_tib_next_best <- cr_tib_mod_tab %>%
 # coefficients, R2
 get_cr_tib_coefCI_lm <- function(zmod.name) {
   zmod <- cr_tib_step2_mods[zmod.name][[1]]
-zmod_coefCI <- cbind(coef(zmod), confint(zmod)) %>% 
-  data.frame() %>% 
-  rename(est = 1, lci = 2, uci = 3) %>% 
-  rownames_to_column("varb") %>% 
-  mutate(mod = zmod.name) %>% 
-  filter(varb != "(Intercept)") %>% 
-  mutate(across(c(est, lci, uci), ~format(round(., 2), nsmall = 2))) %>% 
-  mutate(coef.ci = paste(est, " (", lci, " to ", uci, ")", sep = "")) %>% 
-  select(mod, varb, coef.ci) %>% 
-  pivot_wider(id_cols = mod, names_from = varb, values_from = coef.ci) %>% 
-  mutate(adj.r2 = summary(zmod)$adj.r.squared,
-         adj.r2 = format(round(adj.r2, 2), nsmall = 2))
-
+zmod_coefCI <- get_coef_ci(zmod, zmod.name)
 }
 
 cr_tib_coefCI <- map_df(cr_tib_best_mods$Modnames, get_cr_tib_coefCI_lm) %>%
   rename(Modnames = mod) %>% 
   full_join(cr_tib_best_mods) %>% 
   arrange(Delta_AICc) %>% 
-  dplyr::select(Modnames, cr.age, growth = tibiotar.slope35, SEASON1314, Delta_AICc, adj.r2) %>% 
+  dplyr::select(Modnames, cr.age, growth, SEASON1314, Delta_AICc, adj.r2) %>% 
   mutate(Modnames = gsub("_", " + ", Modnames),
          Modnames = gsub("hatch", "hatch date", Modnames),
          Modnames = gsub("tib.", "", Modnames),
@@ -256,15 +229,15 @@ cr_tib_coefCI <- map_df(cr_tib_best_mods$Modnames, get_cr_tib_coefCI_lm) %>%
 
 cr_size_out_table <- rbind(
   # mass rows
-  data.frame(Modnames = "Competetive creching mass model", cr.age = "", growth = "", sexM = "", SEASON1314 = "", Delta_AICc = "", adj.r2 = ""),
+  data.frame(Modnames = "Competitive creching mass model", cr.age = "", growth = "", sexM = "", SEASON1314 = "", Delta_AICc = "", adj.r2 = ""),
   cr_mass_coefCI,
   data.frame(Modnames = paste("next best model \u0394 AICc = ", cr_mass_next_best$Delta_AICc[[1]]), cr.age = "", growth = "", sexM = "", SEASON1314 = "", Delta_AICc = "", adj.r2 = ""),
   # flipper rows
-  data.frame(Modnames = "Competetive creching flipper length model", cr.age = "", growth = "", sexM = "", SEASON1314 = "", Delta_AICc = "", adj.r2 = ""),
+  data.frame(Modnames = "Competitive creching flipper length model", cr.age = "", growth = "", sexM = "", SEASON1314 = "", Delta_AICc = "", adj.r2 = ""),
   cr_flip_coefCI %>% mutate(sexM = NA),
   data.frame(Modnames = paste("next best model \u0394 AICc = ", cr_mass_next_best$Delta_AICc[[1]]), cr.age = "", growth = "", sexM = "", SEASON1314 = "", Delta_AICc = "", adj.r2 = ""),
     # tib rows
-    data.frame(Modnames = "Competetive creching tibiotarsus length models", cr.age = "", growth = "", sexM = "", SEASON1314 = "", Delta_AICc = "", adj.r2 = ""),
+    data.frame(Modnames = "Competitive creching tibiotarsus length models", cr.age = "", growth = "", sexM = "", SEASON1314 = "", Delta_AICc = "", adj.r2 = ""),
   cr_tib_coefCI %>% mutate(sexM = NA),
   data.frame(Modnames = paste("next best model \u0394 AICc = ", cr_mass_next_best$Delta_AICc[[1]]), cr.age = "", growth = "", sexM = "", SEASON1314 = "", Delta_AICc = "", adj.r2 = "")
 )

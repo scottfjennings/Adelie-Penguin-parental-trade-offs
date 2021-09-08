@@ -1,69 +1,83 @@
 
 
+
+## SEE SOME NOTES BELOW. USING nest.seas AS A RANDOM EFFECT ENDS UP CAUSING OVER-FITTED MODELS ONCE I STY ADDING resid.hatch AND OTHER VARIABLES TO THE MODELS. SO AM JUST USING LINEAR MODELS FOR THE ENTIRE CRECHE TIMING PART OF THE ANALYASIS. CAN PROBABLY DELETE THIS FILE ONCE ALL ANALYSIS IS DONE AND KATIE CHECKS OFF ON RESULTS
+
+
 library(tidyverse)
+library(here)
 library(lme4)
 library(AICcmodavg)
 library(grid)
+library(here)
 options(scipen = 999)
 
 # read data ----
 #  ana.table.full.csv is created by the sequence of numbered code files in THESIS\thesis_data_work\code_files\analysis_data_prep
 #ana.table=read.csv("data/ana.table.full.csv")
-ana.table <- readRDS("data/ana_table_full")
-#ana.table.old=read.csv("data/ana.table.full.old.csv")%>%  rename(CHICK_ID = id)
-# data management ----
-ana.table <- ana.table %>% 
-  mutate(SEASON = as.factor(SEASON),
-         CH_B = as.factor(ifelse(CHICK=="B", "1", "0")),
-         CH_S = as.factor(ifelse(CHICK=="S", "1", "0")))
-
-
-data = ana.table %>% 
-  filter(!is.na(cr.seasday), weight.slope40 >= 0, !is.na(sex))
-
+ana_table <- readRDS(here("data/ana_table_full"))
 
 
 #data.old <- ana.table.old %>% filter(did.cr == "1", !is.na(sex)) 
 
 
 
-# analysis ----
+# fitting models ----
 # first creching age as response variable ----
+data <- ana_table  %>%  
+  filter(!is.na(cr.seasday), !is.na(weight.slope40), !is.na(sex)) %>% 
+  select(SEASON, CHICK_ID, nest.seas, sex, cr.age, weight.slope40, flipper.slope40, tibiotar.slope35, resid.hatch) %>% 
+  mutate(SEASON = as.factor(SEASON),
+         sex = as.factor(sex)) 
+
+
 # creching age model selection step 1 ----
 
 
-sex	<- lmer(cr.age~	sex		 +	(1 | nest.seas)  , data=data, REML = FALSE)
-year	<- lmer(cr.age~	SEASON		 +	(1 | nest.seas) , data=data, REML = FALSE)
-sex_year	<- lmer(cr.age~	sex+SEASON		 +	(1 | nest.seas) , data=data, REML = FALSE)
-sex.year	<- lmer(cr.age~	sex*SEASON		 +	(1 | nest.seas)  , data=data, REML = FALSE)
+sex	<- lmer(cr.age~	sex + (1 | nest.seas), data=data, REML = FALSE)
+year	<- lmer(cr.age~	SEASON + (1 | nest.seas), data=data, REML = FALSE)
+sex_year	<- lmer(cr.age~	sex + SEASON + (1 | nest.seas), data=data, REML = FALSE)
+sex.year	<- lmer(cr.age~	sex * SEASON + (1 | nest.seas), data=data, REML = FALSE)
 
 (cr_age_aic1 <- aictab(list(sex, year, sex_year, sex.year), c("sex", "year", "sex_year", "sex.year")))
 
-saveRDS(cr_age_aic1, "rds/cr_age_aic1")
+saveRDS(cr_age_aic1, here("fitted_models/cr_age_aic1"))
 
-# year model is best supported, but all are competitive
-# sex.year is "singular"
+# year model is best supported
 
 # creching age model selection step 2 ----
+# adding interesting combinations of growth rates and residual hatch date to the year structure from above
+
 
 mass_year	<- lmer(cr.age ~	weight.slope40 + SEASON +	(1 | nest.seas) , data=data, REML = FALSE)
-flip_year	<- lmer(cr.age ~	flipper.slope40	+ SEASON + (1 | nest.seas), data=data, REML = FALSE)
-tib_year	<- lmer(cr.age ~	tibiotar.slope35 +	SEASON +	(1 | nest.seas), data=data, REML = FALSE)
+flip_year	<- lmer(cr.age ~	flipper.slope40 + SEASON + (1 | nest.seas), data=data, REML = FALSE)
+tib_year	<- lmer(cr.age ~	tibiotar.slope35 + SEASON +	(1 | nest.seas), data=data, REML = FALSE)
 hatch_year	<- lmer(cr.age ~	resid.hatch + SEASON +	(1 | nest.seas), data=data, REML = FALSE)
-year	<- lmer(cr.age ~	SEASON +	(1 | nest.seas) , data=data, REML = FALSE)
-mass_hatch_year	<- lmer(cr.age ~	weight.slope40 + resid.hatch +	SEASON + (1 | nest.seas) , data=data, REML = FALSE)
-flip_hatch_year	<- lmer(cr.age ~	flipper.slope40 + resid.hatch +	SEASON + (1 | nest.seas), data=data, REML = FALSE)
-tib_hatch_year	<- lmer(cr.age ~	tibiotar.slope35 + resid.hatch +	SEASON + (1 | nest.seas), data=data, REML = FALSE)
+year <- lmer(cr.age ~	SEASON +	(1 | nest.seas) , data=data, REML = FALSE) # best from step 1
+mass_hatch_year	<- lmer(cr.age ~	weight.slope40 + resid.hatch + SEASON + (1 | nest.seas) , data=data, REML = FALSE)
+flip_hatch_year	<- lmer(cr.age ~	flipper.slope40 + resid.hatch + SEASON + (1 | nest.seas), data=data, REML = FALSE)
+tib_hatch_year	<- lmer(cr.age ~	tibiotar.slope35 + resid.hatch + SEASON + (1 | nest.seas), data=data, REML = FALSE)
 int		<- lmer (cr.age~ 1 +	(1 | nest.seas)  , data=data, REML = FALSE)
 
-# all models with resid.hatch have singular fit
+# all models with resid.hatch have singular fit or convergence issues
 
+# models with resid.hatch are well supported, but they contain suspect coefficient estimates
 (cr_age_aic <- aictab(list(mass_year, flip_year, tib_year, hatch_year, year, mass_hatch_year, flip_hatch_year, tib_hatch_year, int), 
        c("mass_year", "flip_year", "tib_year", "hatch_year", "year", "mass_hatch_year", "flip_hatch_year", "tib_hatch_year", "int")))
 
-saveRDS(cr_age_aic, "rds/cr_age_aic")
+# saveRDS(cr_age_aic, "rds/cr_age_aic")
 
-# same candidate set but without random effect
+# seems the info contained in resid.hatch is too similar to the info contained in nest.seas, and this is compounded by nest.seas having many levels. this makes it difficult for the optimizer to calculate correlations for the all random slopes 
+# expalantion here (https://stats.stackexchange.com/questions/242109/model-failed-to-converge-warning-in-lmer)
+# rescaling resid.hatch and growth variables doesn't eliminate warning messages, and while the estimates for resid.hatch seem more reasonable, their standard errors seem unreasonably small.
+# perhaps the larger issue is that this model is overfit, since the combo of resid.hatch and nest.seas effectively tries to estimate a parameter for each chick.
+
+
+# also residual variances for the random effects are very small, suggesting the random effect (nest.seas) is not particularly usefull in these models
+
+
+
+# so, instead fitting same candidate set but without random effect
 mass_year.lm	<- lm(cr.age ~	weight.slope40 + SEASON, data=data)
 flip_year.lm	<- lm(cr.age ~	flipper.slope40	+ SEASON, data=data)
 tib_year.lm	<- lm(cr.age ~	tibiotar.slope35 +	SEASON, data=data)
@@ -74,17 +88,19 @@ flip_hatch_year.lm	<- lm(cr.age ~	flipper.slope40 + resid.hatch +	SEASON, data=d
 tib_hatch_year.lm	<- lm(cr.age ~	tibiotar.slope35 + resid.hatch +	SEASON, data=data)
 int.lm		<- lm(cr.age~ 1, data=data)
 
+# no warning messages, good/reasonable estimates and SE in top models 
+
 (cr_age_aic.lm <- aictab(list(mass_year.lm, flip_year.lm, tib_year.lm, hatch_year.lm, year.lm, mass_hatch_year.lm, flip_hatch_year.lm, tib_hatch_year.lm, int.lm), 
        c("mass_year.lm", "flip_year.lm", "tib_year.lm", "hatch_year.lm", "year.lm", "mass_hatch_year.lm", "flip_hatch_year.lm", "tib_hatch_year.lm", "int.lm")))
 
-saveRDS(cr_age_aic.lm, "rds/cr_age_aic_lm")
+saveRDS(cr_age_aic.lm, here("fitted_models/cr_age_aic_lm"))
 
 # get same model selection results
 # and similar beta estimates
 
 # creching age output from best models ----
 # coefficients
-get_cr_mass_coefCI <- function() {
+ get_cr_mass_coefCI <- function() {
 mass_hatch_year_coefCI <- cbind(fixef(mass_hatch_year), confint(mass_hatch_year, method="boot")[3:6,]) %>% 
   data.frame() %>% 
   rename(est = 1, lci = 2, uci = 3) %>% 
@@ -167,9 +183,13 @@ coefCI.lm_wider <- coefCI.lm %>%
   select(mod, varb, coef.ci) %>% 
   pivot_wider(id_cols = mod, names_from = varb, values_from = coef.ci) 
 
+coefCI.lm_wider %>% 
+  rename(Modnames = mod) %>% 
+  left_join(., cr_age_aic.lm) %>% 
+  arrange(Delta_AICc) %>% 
+  view()
 
-
-# creching age lmer VCA ----
+# creching age lmer VCA NOT NEEDED BECAUSE lmer DON'T FIT ----
 # residual variance of intercept only model
 int_var <- VarCorr(int) %>% 
   data.frame() %>% 
@@ -220,7 +240,7 @@ lm.adj.r2 <- rbind(data.frame(mod = "hatch_year.lm", adj.r2 = summary(hatch_year
                    data.frame(mod = "flip_hatch_year.lm", adj.r2 = summary(flip_hatch_year.lm)$adj.r.squared))
 
 # creching age combine coefficients, aic variables, variance explained ----
-# mixed mod
+# mixed mod NOT USING 
 coef_aic <- coefCI_wider %>% 
   rename(Modnames = mod) %>% 
   left_join(cr_age_aic) %>% 
@@ -230,7 +250,7 @@ coef_aic <- coefCI_wider %>%
          across(c(Delta_AICc, AICcWt), ~round(., 2))) %>% 
   arrange(Delta_AICc)
 
-saveRDS(coef_aic, "rds/cr_age_best")
+saveRDS(coef_aic, "fitted_models/cr_age_best")
 
 # lm
 coef_aic.lm <- coefCI.lm_wider %>% 
@@ -242,7 +262,7 @@ coef_aic.lm <- coefCI.lm_wider %>%
          across(c(Delta_AICc, AICcWt), ~round(., 2))) %>% 
   arrange(Delta_AICc)
 
-saveRDS(coef_aic.lm, "rds/cr_age_best_lm")
+saveRDS(coef_aic.lm, here("fitted_models/cr_age_best_lm"))
 # creching age plot ----
 
 fm1 <- lmer(cr.age ~	weight.slope40 + resid.hatch +	SEASON + (1 | nest.seas) , data=data, REML = TRUE)
@@ -307,6 +327,13 @@ ggplot(cr.age.pred, group = factor(weight.slope40))+
 
 
   
+# second, creching size as response variable ----
+data <- ana_table  %>%  
+  filter(!is.na(cr.seasday), !is.na(weight.slope40), !is.na(sex)) %>% 
+  select(SEASON, CHICK_ID, nest.seas, sex, cr.age, weight.slope40, flipper.slope40, tibiotar.slope35, resid.hatch, cr.mass, cr.tib, cr.flip) %>% 
+  mutate(SEASON = as.factor(SEASON),
+         sex = as.factor(sex)) 
+
 # creching mass model selection step 1 ----
 
 

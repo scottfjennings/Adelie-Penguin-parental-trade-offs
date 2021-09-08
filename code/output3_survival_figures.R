@@ -14,16 +14,17 @@ setwd(here("mark_output"))
 ana_table <- readRDS(here('data/ana_table_full')) 
 
 ana_table %>% 
-  filter(!is.na(sex), did.cr == 1) %>% 
+  filter(!is.na(sex), !is.na(cr.age)) %>% 
   count(SEASON, sex, OUTCOME) 
 
 
 ana_table %>% 
-  filter(!is.na(sex), did.cr == 1) %>%
+  filter(!is.na(sex), !is.na(cr.age)) %>%
   group_by(SEASON, sex) %>% 
   summarise_at("cr.mass", list(min = min, mean = mean, max = max, num.chx = length))
 
 
+sex_seas_phi_pims <- readRDS(here("fitted_models/sex_seas_phi_pims"))
 
 # total PIM per group should be
 # sum(48 - seq(0, 48))
@@ -111,13 +112,7 @@ pred_se <- rbind(f12_se, f13_se, m12_se, m13_se) %>%
 
 #
 # base survival ----
-phi_step2 <- readRDS(here("fitted_models/phi_step1"))
-
-##--model averaging for step 2 models- this does real estimates
-step2_mod_av = model.average(phi_step2, "Phi", vcv=TRUE, drop = FALSE)
-
-
-
+# read model averaged estimates from CH4_base_survival.R
 step2_mod_av <- readRDS(here("fitted_models/step2_mod_av"))
 
 # no cohort effects, all estimates equal for each cohort, so just take estimates for first cohort
@@ -126,15 +121,14 @@ step2_mod_av_est <- filter(step2_mod_av$estimates, occ.cohort == 1)
 
 # plot 
 step2_mod_av_est %>% 
-  mutate(time = as.numeric(as.character(time)),
-         days.past.hatch = time - 49) %>% 
+  mutate(time = as.numeric(as.character(time))) %>% 
   ggplot() +
   #geom_point(aes(x = time, y = estimate)) +
-	geom_line(aes(x = days.past.hatch, y = estimate, group = group)) +
-	geom_line(aes(x = days.past.hatch,  y = ucl, group = group), linetype="dotted") +
-	geom_line(aes(x = days.past.hatch, y = lcl, group = group), linetype="dotted") +
+	geom_line(aes(x = time, y = estimate, group = group)) +
+	geom_line(aes(x = time,  y = ucl, group = group), linetype="dotted") +
+	geom_line(aes(x = time, y = lcl, group = group), linetype="dotted") +
   facet_grid(sex~SEASON) +
-  labs(x = "Days past hatching",
+  labs(x = "Day of season",
        y = "Estimated daily survival") +
   theme_bw()
 
@@ -151,9 +145,9 @@ cr_age_size_models <- readRDS(here("fitted_models/cr_age_size_models_cronly"))
 model.table(cr_age_size_models, use.lnl = TRUE)
 # survival estimates based on flipper model ----
 summary(ana_table$cr.flip)
-cr_flip_span = seq(88, 131, length.out = 10)
+cr_flip_span = seq(55, 155, length.out = 10)
 
-flip_mod <- cr_age_size_models$Phi.SEASON.sex_hatch_T_crflip
+flip_mod <- cr_age_size_models$Phi.SEASON_hatch_TT_crflip
 
 make_flip_pred <- function(zcr.flip) {
 flip.pred=covariate.predictions(flip_mod, data=data.frame(cr.flip = zcr.flip, did.cr = 1), indices=c(1:48, 1177:1224, 2353:2400, 3529:3576), alpha=0.025)
@@ -162,7 +156,7 @@ make_flip_pred_cronly <- function(zcr.flip) {
 flip.pred=covariate.predictions(flip_mod, data=data.frame(cr.flip = zcr.flip), indices=c(1:48, 1177:1224, 2353:2400, 3529:3576), alpha=0.025)
 }
 
-flip_preds <- map(cr_flip_span, make_flip_pred)
+flip_preds <- map(cr_flip_span, make_flip_pred_cronly)
   
 
 # daily survival probability plot - flipper model ----
@@ -199,7 +193,7 @@ flip_preds_daily %>%
 					)  + 
       guides(color = guide_legend(reverse = TRUE))
 
-ggsave(here("../MSdocs/daily_survival_by_flipper_cr_chicks.png")) 
+ggsave(here("../MSdocs/daily_survival_by_flipper_cr_chicks.png"), width = 6) 
   
 
 # overall survival probability plot - flipper model ----
@@ -227,23 +221,25 @@ flip_overall_pred_se <- full_join(flip_overall_pred, flip_overall_se) %>%
 
 # change title to reflect which results
   flip_overall_pred_se %>% 
+    mutate(SEASON = ifelse(SEASON == "1213", "2012-13", "2013-14"),
+           lci = ifelse(lci < 0, 0, lci),
+           uci = ifelse(uci > 1, 1, uci)) %>% 
     ggplot() +
     geom_line(aes(cr.flip, overall.surv)) +
     geom_ribbon(aes(x = cr.flip, ymin = lci, ymax = uci), alpha = 0.2) +
     labs(x = "Creching flipper length (mm)",
-         y = "Probability of surviving to flegde",
-         title = "Creched chicks") +
+         y = "Probability of surviving to flegde") +
     theme_bw() +
-    facet_grid(sex~SEASON)
+    facet_grid(~SEASON)
   
- ggsave(here("../MSdocs/survival_by_flipper_cr_chicks.png")) 
+ ggsave(here("../MSdocs/survival_by_flipper_cr_chicks.png"), width = 6) 
   
   
 # make mass model plot ----
   summary(ana_table$cr.mass)
-  zcr.mass <- seq(100, 2900, length.out = 100)
+  zcr.mass <- seq(300, 2900, length.out = 10)
 
-  mass_mod <- cr_age_size_models$Phi.SEASON.sex_hatch_T_crmass
+  mass_mod <- cr_age_size_models$Phi.SEASON_hatch_TT_crmass
 
 make_mass_pred <- function(zcr.mass) {
   mass.pred=covariate.predictions(mass_mod, data=data.frame(cr.mass=zcr.mass), indices=c(1:48, 1177:1224, 2353:2400, 3529:3576), alpha=0.025)
@@ -299,18 +295,104 @@ mass_overall_pred_se <- full_join(mass_overall_pred, mass_overall_se) %>%
 
 
   mass_overall_pred_se %>% 
+    mutate(SEASON = ifelse(SEASON == "1213", "2012-13", "2013-14"),
+           lci = ifelse(lci < 0, 0, lci),
+           uci = ifelse(uci > 1, 1, uci)) %>% 
     ggplot() +
     geom_line(aes(mass, overall.surv)) +
     geom_ribbon(aes(x = mass, ymin = lci, ymax = uci), alpha = 0.2) +
+    scale_x_continuous(breaks = seq(500, 3000, by = 500), labels = seq(500, 3000, by = 500)) +
+    scale_y_continuous(breaks = seq(0, 1, by = 0.1), labels = seq(0, 1, by = 0.1)) +
     labs(x = "Creching mass (g)",
-         y = "Probability of surviving to flegde",
-         title = "Creched chicks") +
+         y = "Probability of surviving to flegde") +
     theme_bw() +
-    facet_grid(sex~SEASON)
+    facet_grid(~SEASON)
   
   
   
  ggsave(here("../MSdocs/survival_by_mass_cr_chicks.png")) 
+  
+
+
+
+
+
+ # make tib model plot ----
+  summary(ana_table$cr.tib)
+  zcr.tib <- seq(75, 140, length.out = 10)
+
+  tib_mod <- cr_age_size_models$Phi.SEASON_hatch_TT_crtib
+
+make_tib_pred <- function(zcr.tib) {
+  tib.pred=covariate.predictions(tib_mod, data=data.frame(cr.tib=zcr.tib), indices=c(1:48, 1177:1224, 2353:2400, 3529:3576), alpha=0.025)
+}
+
+tib_preds <- map(zcr.tib, make_tib_pred)
+
+# daily survival probability plot - tib model ----
+tib_preds_daily <- map_df(tib_preds, get_daily_pred) %>% 
+  ungroup() %>% 
+  rename(tib = covdata)
+
+tib_preds_daily %>% 
+ggplot()+
+	geom_line(aes(x = day, y = estimate, color = as.factor(tib)), size=1) +
+	#geom_line(aes(x = day, y = ucl, color = pred), linetype = "dotted", size = 1) +
+	#geom_line(aes(x = day, y = lcl, color = pred), linetype = "dotted", size = 1) +
+	scale_colour_discrete(name="Creching\ntib (mm)")+
+	#geom_vline(xintercept = 67, linetype = "longdash", alpha=0.3, size=1)+
+	facet_grid(sex~SEASON)+
+	labs(y = "Daily survival probability",
+	     x = "Days past hatching",
+	     title = "Creched chicks")+
+	ylim(0.65,1)+
+	theme_bw()+
+				theme(plot.background = element_blank(),
+				      panel.grid.minor = element_blank(),
+				      panel.grid.major = element_blank(),
+				      strip.background = element_blank(),
+				      axis.ticks = element_blank(),
+				      axis.text = element_text(size = 15),
+				      axis.title = element_text(size = 20),
+				      strip.text = element_text(size = 15)
+					)  + 
+      guides(color = guide_legend(reverse = TRUE))
+
+ggsave(here("../MSdocs/daily_survival_by_tib_cr_chicks.png")) 
+
+# overall survival probability plot - tib model ----
+
+tib_overall_pred <- map_df(tib_preds, get_overall_pred) %>% 
+  ungroup()
+  
+
+tib_overall_se <- map_df(tib_preds, get_overall_se) %>% 
+  ungroup()
+
+
+tib_overall_pred_se <- full_join(tib_overall_pred, tib_overall_se) %>% 
+  mutate(lci = overall.surv - (1.96 * se),
+         uci = overall.surv + (1.96 * se)) %>% 
+  rename(tib = covdata)
+
+
+  tib_overall_pred_se %>% 
+    mutate(SEASON = ifelse(SEASON == "1213", "2012-13", "2013-14"),
+           lci = ifelse(lci < 0, 0, lci),
+           uci = ifelse(uci > 1, 1, uci)) %>% 
+    ggplot() +
+    geom_line(aes(tib, overall.surv)) +
+    geom_ribbon(aes(x = tib, ymin = lci, ymax = uci), alpha = 0.2) +
+    scale_x_continuous(breaks = seq(70, 150, by = 10), labels = seq(70, 150, by = 10)) +
+    scale_y_continuous(breaks = seq(0, 1, by = 0.1), labels = seq(0, 1, by = 0.1)) +
+    labs(x = "Creching tibiotarsus (mm)",
+         y = "Probability of surviving to flegde") +
+    theme_bw() +
+    facet_grid(~SEASON)
+  
+  
+  
+ ggsave(here("../MSdocs/survival_by_tib_cr_chicks.png")) 
   
 
 

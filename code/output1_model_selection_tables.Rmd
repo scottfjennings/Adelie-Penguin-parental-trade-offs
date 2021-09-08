@@ -13,6 +13,7 @@ knitr::opts_chunk$set(echo = FALSE,
 ```{r}
 library(tidyverse)
 library(flextable)
+library(ftExtra)
 library(here)
 library(RMark)
 
@@ -37,15 +38,16 @@ fix_mod_names <- function(mod.table) {
            mod.name = gsub("res.htch + I(res.htch^2)", "Hatch2", mod.name, fixed = TRUE),
            mod.name = gsub("res.htch", "Hatch", mod.name),
            mod.name = gsub("1", "Intercept only", mod.name),
-           mod.name = gsub("weight", "Mass growth", mod.name),
-           mod.name = gsub("tibiotar", "Tibiotarsus growth", mod.name),
-           mod.name = gsub("flipper", "Flipper growth", mod.name),
+           mod.name = gsub("mass.gr", "Mass growth", mod.name),
+           mod.name = gsub("tib.gr", "Tibiotarsus growth", mod.name),
+           mod.name = gsub("flip.gr", "Flipper growth", mod.name),
            mod.name = gsub("did.cr", "Creched", mod.name),
            mod.name = gsub("cr.mass", "Creching mass", mod.name),
            mod.name = gsub("cr.flip", "Creching flipper", mod.name),
            mod.name = gsub("cr.tib", "Creching tibiotarsus", mod.name),
-           mod.name = gsub("fate.age", "Creching age", mod.name),
-           mod.name = gsub("dayold", "Age", mod.name))
+           mod.name = gsub("cr.age", "Creching age", mod.name),
+           mod.name = gsub("dayold", "Age", mod.name)) %>% 
+    mutate(mod.name = stringr::str_replace_all(mod.name, "([2-9]+)", "^\\1^"))
   
 }
 
@@ -79,7 +81,8 @@ p_modtable %>%
                     Neg2LnL = "-2lnL") %>% 
   align(j = 2:5, align = "center", part = "all") %>% 
   autofit() %>% 
-  footnote(i = 1, j = 1, part = "header", value = as_paragraph(paste("\u03D5 structure =", saturated_phi[[1]])))
+  footnote(i = 1, j = 1, part = "header", value = as_paragraph(paste("\u03D5 structure =", saturated_phi[[1]])))%>%
+  colformat_md()
 
 ```
 <br>
@@ -111,7 +114,8 @@ phi_step1_modtable %>%
                     Neg2LnL = "-2lnL") %>% 
   align(j = 2:5, align = "center", part = "all") %>% 
   autofit() %>% 
-  footnote(i = 1, j = 1, part = "header", value = as_paragraph(paste("p structure =", p_stru[[1]])))
+  footnote(i = 1, j = 1, part = "header", value = as_paragraph(paste("p structure =", p_stru[[1]]))) %>%
+  colformat_md()
 
 ```
 
@@ -144,7 +148,8 @@ phi_step2_modtable %>%
                     Neg2LnL = "-2lnL") %>% 
   align(j = 2:5, align = "center", part = "all") %>% 
   autofit() %>% 
-  footnote(i = 1, j = 1, part = "header", value = as_paragraph(paste("p structure =", p_stru[[1]])))
+  footnote(i = 1, j = 1, part = "header", value = as_paragraph(paste("p structure =", p_stru[[1]])))%>%
+  colformat_md()
 
 ```
 
@@ -180,7 +185,8 @@ growth_surv_modtable %>%
                     Neg2LnL = "-2lnL") %>% 
   align(j = 2:5, align = "center", part = "all") %>% 
   autofit() %>% 
-  footnote(i = 1, j = 1, part = "header", value = as_paragraph(paste("p structure =", p_stru[[1]])))
+  footnote(i = 1, j = 1, part = "header", value = as_paragraph(paste("p structure =", p_stru[[1]])))%>%
+  colformat_md()
 
 ```
 
@@ -193,7 +199,7 @@ Table S5. Model selection results for determining the the ability of creching ag
 ```{r}
 
 
-cr_age_size_modtable <- readRDS(here("fitted_models/cr_age_size_models")) %>% 
+cr_age_size_modtable <- readRDS(here("fitted_models/cr_age_size_models_cronly")) %>% 
   model.table(use.lnl=TRUE) 
 
 
@@ -215,6 +221,7 @@ cr_age_size_modtable %>%
                     Neg2LnL = "-2lnL") %>% 
   align(j = 2:5, align = "center", part = "all") %>% 
   autofit() %>% 
-  footnote(i = 1, j = 1, part = "header", value = as_paragraph(paste("p structure =", p_stru[[1]])))
+  footnote(i = 1, j = 1, part = "header", value = as_paragraph(paste("p structure =", p_stru[[1]])))%>%
+  colformat_md()
 
 ```
