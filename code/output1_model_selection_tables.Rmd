@@ -14,6 +14,8 @@ knitr::opts_chunk$set(echo = FALSE,
 library(tidyverse)
 library(flextable)
 library(ftExtra)
+library(officer)
+library(AICcmodavg)
 library(here)
 library(RMark)
 
@@ -23,7 +25,71 @@ library(RMark)
 
 ```{r}
 
-fix_mod_names <- function(mod.table) {
+cr_timing_in_table <- function(zmod.list) {
+mod_table <- zmod.list %>%  
+  aictab() %>% 
+  data.frame()  %>% 
+  mutate(Neg2LnL = -2 * LL)%>% 
+  select(Modnames, K, Delta_AICc, AICcWt, Neg2LnL) %>% 
+  mutate(across(.cols = c(Delta_AICc, AICcWt, Neg2LnL),  ~format(round(., 2), nsmall = 2)))
+}
+
+fix_cr_age_mod_names <- function(zmod.table) {
+  zmod.table <- zmod.table %>% 
+  mutate(Modnames = gsub("\\.", " * ", Modnames),
+         Modnames = gsub("_", " + ", Modnames),
+         Modnames = gsub("sex", "Sex", Modnames),
+         Modnames = gsub("year", "Year", Modnames),
+         Modnames = gsub("hatch", "Hatch date", Modnames),
+         Modnames = gsub("mass", "Mass growth", Modnames),
+         Modnames = gsub("tib", "Tibiotarsus growth", Modnames),
+         Modnames = gsub("flip", "Flipper growth", Modnames),
+         Modnames = gsub("int", "Intercept only", Modnames)
+         )
+}
+
+
+
+fix_cr_siz_mod_names <- function(zmod.table) {
+  zmod.table <- zmod.table %>% 
+  mutate(Modnames = gsub("mass.", "", Modnames),
+         Modnames = gsub("tib.", "", Modnames),
+         Modnames = gsub("flip.", "", Modnames),
+         Modnames = gsub("\\.", " * ", Modnames),
+         Modnames = gsub("_", " + ", Modnames),
+         Modnames = gsub("sex", "Sex", Modnames),
+         Modnames = gsub("year", "Year", Modnames),
+         Modnames = gsub("hatch", "Hatch date", Modnames),
+         Modnames = gsub("age", "Age", Modnames),
+         Modnames = gsub("int", "Intercept only", Modnames))
+}
+
+
+
+cr_timing_out_table <- function(step1_tab, step2_tab) {
+out_table <- rbind(
+  # step 1
+  data.frame(Modnames = "Step 1", K = "", Delta_AICc = "", AICcWt = "", Neg2LnL = ""),
+  step1_tab,
+  # step 2
+  data.frame(Modnames = "Step 2", K = "", Delta_AICc = "", AICcWt = "", Neg2LnL = ""),
+  step2_tab)
+
+flextable(out_table) %>% 
+    set_header_labels(Modnames = "Model structure",
+                    Delta_AICc = "\u0394 QAICc",
+                    AICcWt = "AICc wt",
+                    Neg2LnL = "-2lnL") %>% 
+  align(j = 2:5, align = "center", part = "all") %>% 
+  border(i = 1, j = 1, border.bottom = fp_border(color = "black"), part = "body") %>% # step 1 sub border
+  border(i = 1 + nrow(step1_tab), border.bottom = fp_border(color = "black"), part = "body") %>% # step 2 top border
+  border(i = 2 + nrow(step1_tab), j = 1, border.bottom = fp_border(color = "black"), part = "body") %>% # step 2 sub border
+  autofit() %>% 
+  colformat_md()
+}
+
+
+fix_survival_mod_names <- function(mod.table) {
   mod.table <- mod.table %>% 
     mutate(mod.name = gsub("~", "", mod.name),
            #mod.name = gsub("\\(", "", mod.name),
@@ -54,25 +120,92 @@ fix_mod_names <- function(mod.table) {
 
 ```
 
-Table S1. Model selection results for determining the best model structure for estimating resighting probabilities of Adélie Penguin chicks during the entire chick-provisioning period at Cape Crozier, Ross Island, Antarctica, 2012-2013. 
+Table S1. Model selection results for determining the best model structure for estimating the age that Adélie Penguin chicks entered the creche stage at Cape Crozier, Ross Island, Antarctica, 2012-2013. 
+```{r}
+
+cr_timing_out_table(
+  readRDS(here("fitted_models/cr_timing/cr_age_step1_mods")) %>%
+    cr_timing_in_table() %>%
+    fix_cr_age_mod_names(),
+  readRDS(here("fitted_models/cr_timing/cr_age_step2_mods")) %>%
+    cr_timing_in_table() %>%
+    fix_cr_age_mod_names()
+)
+
+
+
+
+```
+
+Table S2. Model selection results for determining the best model structure for estimating the mass that Adélie Penguin chicks entered the creche stage at Cape Crozier, Ross Island, Antarctica, 2012-2013. 
+```{r}
+cr_timing_out_table(
+  readRDS(here("fitted_models/cr_timing/cr_mass_step1_mods")) %>%
+    cr_timing_in_table() %>%
+    fix_cr_siz_mod_names() %>%
+    mutate(Modnames = gsub("growth", "Mass growth", Modnames)),
+  readRDS(here("fitted_models/cr_timing/cr_mass_step2_mods")) %>%
+    cr_timing_in_table() %>%
+    fix_cr_siz_mod_names() %>%
+    mutate(Modnames = gsub("growth", "Mass growth", Modnames))
+)
+```
+
+
+Table S3. Model selection results for determining the best model structure for estimating the flipper length that Adélie Penguin chicks entered the creche stage at Cape Crozier, Ross Island, Antarctica, 2012-2013. 
+```{r}
+cr_timing_out_table(
+  readRDS(here("fitted_models/cr_timing/cr_flip_step1_mods")) %>% 
+    cr_timing_in_table() %>% 
+    fix_cr_siz_mod_names() %>% 
+    mutate(Modnames = gsub("growth", "Mass growth", Modnames)),
+  readRDS(here("fitted_models/cr_timing/cr_flip_step2_mods")) %>% 
+    cr_timing_in_table() %>% 
+    fix_cr_siz_mod_names() %>% 
+    mutate(Modnames = gsub("growth", "Flipper growth", Modnames))
+)
+
+
+
+```
+
+Table S4. Model selection results for determining the best model structure for estimating the tibiotarsus length that Adélie Penguin chicks entered the creche stage at Cape Crozier, Ross Island, Antarctica, 2012-2013. 
+```{r}
+cr_timing_out_table(
+  readRDS(here("fitted_models/cr_timing/cr_tib_step1_mods")) %>% 
+  cr_timing_in_table() %>% 
+  fix_cr_siz_mod_names() %>% 
+  mutate(Modnames = gsub("growth", "Tibiotarsus growth", Modnames)),
+readRDS(here("fitted_models/cr_timing/cr_tib_step2_mods")) %>% 
+  cr_timing_in_table() %>% 
+  fix_cr_siz_mod_names() %>% 
+  mutate(Modnames = gsub("growth", "Tibiotarsus growth", Modnames))
+)
+
+
+
+```
+
+
+Table S5. Model selection results for determining the best model structure for estimating resighting probabilities of Adélie Penguin chicks during the entire chick-provisioning period at Cape Crozier, Ross Island, Antarctica, 2012-2013. 
 
 ```{r}
 
 
-p_modtable <- readRDS(here("fitted_models/p_mod_list")) %>% 
+p_modtable <- readRDS(here("fitted_models/survival/p_models")) %>% 
   model.table(use.lnl=TRUE) 
 
 
 saturated_phi = distinct(p_modtable, Phi) %>% 
   rename(mod.name = Phi) %>% 
-  fix_mod_names()
+  fix_survival_mod_names()
 
 p_modtable %>% 
   select(mod.name = p, npar, DeltaQAICc, weight, Neg2LnL) %>% 
   mutate(DeltaQAICc = round(DeltaQAICc, 3),
          weight = round(weight, 3),
          Neg2LnL = round(Neg2LnL, 3)) %>% 
-  fix_mod_names() %>% 
+  fix_survival_mod_names() %>% 
   flextable() %>% 
   set_header_labels(mod.name = "p model structure",
                     npar = "K",
@@ -87,25 +220,25 @@ p_modtable %>%
 ```
 <br>
 
-Table S2. Model selection results for the first step in determining the best model structure for estimating survival probabilities of Adélie Penguin chicks at Cape Crozier, Ross Island, Antarctica, 2012-2013. The candidate set in this stage of model selection included model structures to evaluate the relative importance of Year, Sex and relative Hatch date in explaining survival across the entire chick-provisioning period.
+Table S6. Model selection results for the first step in determining the best model structure for estimating survival probabilities of Adélie Penguin chicks at Cape Crozier, Ross Island, Antarctica, 2012-2013. The candidate set in this stage of model selection included model structures to evaluate the relative importance of Year, Sex and relative Hatch date in explaining survival across the entire chick-provisioning period.
 
 ```{r}
 
 
-phi_step1_modtable <- readRDS(here("fitted_models/phi_step1")) %>% 
+phi_step1_modtable <- readRDS(here("fitted_models/survival/overall_survival_step1_models")) %>% 
   model.table(use.lnl=TRUE) 
 
 
 p_stru = distinct(phi_step1_modtable, p) %>% 
   rename(mod.name = p) %>% 
-  fix_mod_names()
+  fix_survival_mod_names()
 
 phi_step1_modtable %>% 
   select(mod.name = Phi, npar, DeltaQAICc, weight, Neg2LnL) %>% 
   mutate(DeltaQAICc = round(DeltaQAICc, 3),
          weight = round(weight, 3),
          Neg2LnL = round(Neg2LnL, 3)) %>% 
-  fix_mod_names() %>% 
+  fix_survival_mod_names() %>% 
   flextable() %>% 
   set_header_labels(mod.name = "\u03D5 model structure",
                     npar = "K",
@@ -121,25 +254,25 @@ phi_step1_modtable %>%
 
 <br>
 
-Table S3. Model selection results for the second step in determining the best model structure for estimating survival probabilities of Adélie Penguin chicks during the entire chick-provisioning period at Cape Crozier, Ross Island, Antarctica, 2012-2013. The candidate set in this stage of model selection included the competitive model structures from the first step (Δ QAICc ≤ 2; see Table S2), and added structures to evaluate time effects on survival across the entire chick-provisioning period.
+Table S7. Model selection results for the second step in determining the best model structure for estimating survival probabilities of Adélie Penguin chicks during the entire chick-provisioning period at Cape Crozier, Ross Island, Antarctica, 2012-2013. The candidate set in this stage of model selection included the competitive model structures from the first step (Δ QAICc ≤ 2; see Table S2), and added structures to evaluate time effects on survival across the entire chick-provisioning period.
 
 ```{r}
 
 
-phi_step2_modtable <- readRDS(here("fitted_models/phi_step2"))%>% 
+phi_step2_modtable <- readRDS(here("fitted_models/survival/overall_survival_step2_models"))%>% 
   model.table(use.lnl=TRUE) 
 
 
 p_stru = distinct(phi_step2_modtable, p) %>% 
   rename(mod.name = p) %>% 
-  fix_mod_names()
+  fix_survival_mod_names()
 
 phi_step2_modtable %>% 
   select(mod.name = Phi, npar, DeltaQAICc, weight, Neg2LnL) %>% 
   mutate(DeltaQAICc = round(DeltaQAICc, 3),
          weight = round(weight, 3),
          Neg2LnL = round(Neg2LnL, 3)) %>% 
-  fix_mod_names() %>% 
+  fix_survival_mod_names() %>% 
   flextable() %>% 
   set_header_labels(mod.name = "\u03D5 model structure",
                     npar = "K",
@@ -157,26 +290,26 @@ phi_step2_modtable %>%
 
 <br>
 
-Table S4. Model selection results for determining the the ability of growth rates to explain estimated survival probabilities of Adélie Penguin chicks during the entire chick-provisioning period at Cape Crozier, Ross Island, Antarctica, 2012-2013. The candidate set in this stage of model selection included the best-supported model structure from the second step of estimating survival across entire chick-provisioning period (see Table S3).
+Table S8. Model selection results for determining the the ability of growth rates to explain estimated survival probabilities of Adélie Penguin chicks during the entire chick-provisioning period at Cape Crozier, Ross Island, Antarctica, 2012-2013. The candidate set in this stage of model selection included the best-supported model structure from the second step of estimating survival across entire chick-provisioning period (see Table S3).
 
 ```{r}
 
 
 
-growth_surv_modtable <- readRDS(here("fitted_models/growth_surv_models")) %>% 
+growth_surv_modtable <- readRDS(here("fitted_models/survival/growth_surv_models")) %>% 
   model.table(use.lnl=TRUE) 
 
 
 p_stru = distinct(growth_surv_modtable, p) %>% 
   rename(mod.name = p) %>% 
-  fix_mod_names()
+  fix_survival_mod_names()
 
 growth_surv_modtable %>% 
   select(mod.name = Phi, npar, DeltaQAICc, weight, Neg2LnL) %>% 
   mutate(DeltaQAICc = round(DeltaQAICc, 3),
          weight = round(weight, 3),
          Neg2LnL = round(Neg2LnL, 3)) %>% 
-  fix_mod_names() %>% 
+  fix_survival_mod_names() %>% 
   flextable() %>% 
   set_header_labels(mod.name = "\u03D5 model structure",
                     npar = "K",
@@ -185,7 +318,7 @@ growth_surv_modtable %>%
                     Neg2LnL = "-2lnL") %>% 
   align(j = 2:5, align = "center", part = "all") %>% 
   autofit() %>% 
-  footnote(i = 1, j = 1, part = "header", value = as_paragraph(paste("p structure =", p_stru[[1]])))%>%
+  footnote(i = 1, j = 1, part = "header", value = as_paragraph(paste("p structure =", p_stru[[1]]))) %>%
   colformat_md()
 
 ```
@@ -194,25 +327,25 @@ growth_surv_modtable %>%
 
 <br>
 
-Table S5. Model selection results for determining the the ability of creching age or size to explain estimated survival probabilities of Adélie Penguin chicks during the entire chick-provisioning period at Cape Crozier, Ross Island, Antarctica, 2012-2013. The candidate set in this stage of model selection included the best-supported model structure from the second step of estimating survival across entire chick-provisioning period (see Table S3) and from determining the ability of growth rates to explain survival (see Table S4).
+Table S9. Model selection results for determining the the ability of creching age or size to explain estimated survival probabilities of Adélie Penguin chicks during the entire chick-provisioning period at Cape Crozier, Ross Island, Antarctica, 2012-2013. The candidate set in this stage of model selection included the best-supported model structure from the second step of estimating survival across entire chick-provisioning period (see Table S3) and from determining the ability of growth rates to explain survival (see Table S4).
 
 ```{r}
 
 
-cr_age_size_modtable <- readRDS(here("fitted_models/cr_age_size_models_cronly")) %>% 
+cr_age_size_modtable <- readRDS(here("fitted_models/survival/cr_age_size_models")) %>% 
   model.table(use.lnl=TRUE) 
 
 
 p_stru = distinct(cr_age_size_modtable, p) %>% 
   rename(mod.name = p) %>% 
-  fix_mod_names()
+  fix_survival_mod_names()
 
 cr_age_size_modtable %>% 
   select(mod.name = Phi, npar, DeltaQAICc, weight, Neg2LnL) %>% 
   mutate(DeltaQAICc = round(DeltaQAICc, 3),
          weight = round(weight, 3),
          Neg2LnL = round(Neg2LnL, 3)) %>% 
-  fix_mod_names() %>% 
+  fix_survival_mod_names() %>% 
   flextable() %>% 
   set_header_labels(mod.name = "\u03D5 model structure",
                     npar = "K",
