@@ -96,8 +96,9 @@ Phi.SEASON_hatch_TT_crflip =	run.phi.model(list(formula = ~ SEASON + res.htch + 
 Phi.SEASON_hatch_TT_crtib = run.phi.model(list(formula = ~ SEASON + res.htch + Time + I(Time^2) + cr.tib)) # cr tib + best overall
 Phi.SEASON_hatch_TT_crage = run.phi.model(list(formula =	~ SEASON + res.htch + Time + I(Time^2) + cr.age)) # cr age + best overall
 					
+Phi.dot = run.phi.model(list(formula = ~1))
 
-cr_age_size_models = collect.models(lx=c("Phi.cr.mass", "Phi.cr.flip", "Phi.cr.tib", "Phi.crage", "Phi.SEASON_hatch_TT", "Phi.SEASON_hatch_TT_tibgr", "Phi.SEASON_hatch_TT_crmass", "Phi.SEASON_hatch_TT_crtib", "Phi.SEASON_hatch_TT_crflip", "Phi.SEASON_hatch_TT_crage"))
+cr_age_size_models = collect.models(lx=c("Phi.cr.mass", "Phi.cr.flip", "Phi.cr.tib", "Phi.crage", "Phi.SEASON_hatch_TT", "Phi.SEASON_hatch_TT_tibgr", "Phi.SEASON_hatch_TT_crmass", "Phi.SEASON_hatch_TT_crtib", "Phi.SEASON_hatch_TT_crflip", "Phi.SEASON_hatch_TT_crage", "Phi.dot"))
 
 model.table(cr_age_size_models)
 
