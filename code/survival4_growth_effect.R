@@ -70,7 +70,6 @@ growth_effect_pims <- penguins.ddl$Phi
 # best model for overall survival is Phi(~SEASON + res.htch + Time + I(Time^2))p(~SEASON + time)
 
 
-# packages loaded in CH4_prep_survival_data
 
 run.phi.model<-function(phi.stru) {
 mark(penguins.process, penguins.ddl, model.parameters = list(Phi = phi.stru, p = list(formula = ~SEASON + time)), output = FALSE, chat = 1.25)
