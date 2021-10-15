@@ -18,6 +18,7 @@ library(AICcmodavg)
 library(flextable)
 library(ftExtra)
 library(officer)
+library(RMark)
 
 options(scipen = 999)
 ```
@@ -291,6 +292,84 @@ cr_size_out_table %>%
   fit_to_width(max_width = 7.5) %>% 
   align(j = 2:6, align = "center", part = "all") %>% 
   colformat_md()%>% 
+  fontsize(size = 9, part = "all")
+
+```
+
+<br>
+<br>
+
+Creche period survival
+```{r }
+# creching age output from best models ----
+cr_age_size_surv <- readRDS(here("fitted_models/survival/cr_age_size_models"))
+
+cr_age_size_surv_tab <- model.table(cr_age_size_surv) %>% 
+  data.frame()
+
+int_deviance <- cr_age_size_surv$Phi.dot$results$deviance
+
+get_phi_betas <- function(zmod.name) {
+  zmod <- cr_age_size_surv[zmod.name]
+  betas <- zmod[[1]]$results$beta %>% 
+    data.frame() %>% 
+    rownames_to_column("coef") %>% 
+    mutate(model = zmod[[1]]$model.name,
+           mod.name = names(zmod),
+           dev.expl = zmod[[1]]$results$deviance) %>% 
+    filter(grepl("Phi", coef), !grepl("Intercept", coef), coef != "Phi:I(Time^2)", coef != "Phi:Time")
+}
+
+betas <- map_df(names(cr_age_size_surv[1:10]), get_phi_betas)
+
+aic_betas <- full_join(cr_age_size_surv_tab %>% select(model, DeltaQAICc), betas) %>% 
+  filter(DeltaQAICc < 2)
+
+aic_beta_table <- aic_betas %>% 
+  select(-model, -se) %>% 
+  rename(est = estimate, lci = lcl, uci = ucl) %>% 
+  mutate(coef = case_when(grepl("cr.", coef) ~ "Creching size",
+                          grepl("SEASON", coef) ~ "Year",
+                          grepl("htch", coef) ~ "Hatch date",
+                          grepl("tib.gr", coef) ~ "Tibiotarsus growth")) %>% 
+  #mutate(across(c(est, lci, uci), ~format(round(., 4), nsmall = 4))) %>% 
+   mutate(across(c(est, lci, uci), 
+             ~ case_when(coef == "Year" ~ format(round(., 2), nsmall = 2),
+                         coef == "Hatch day" ~ format(round(., 3), nsmall = 3),
+                         coef == "Creching size" ~ format(round(., 4), nsmall = 4)))) %>% 
+  mutate(across(c(est, lci, uci), ~trimws(.))) %>% 
+  mutate(coef.ci = paste(est, " (", lci, "; ", uci, ")", sep = ""),
+         DeltaQAICc = round(DeltaQAICc, 2)) %>% 
+  pivot_wider(id_cols = c(mod.name, DeltaQAICc), names_from = coef, values_from = coef.ci) %>% 
+  relocate(DeltaQAICc, .after = last_col()) %>% 
+  rename(Modnames = mod.name) %>% 
+  mutate(Modnames = gsub("Phi.", "", Modnames),
+         Modnames = gsub("_", " + ", Modnames),
+         Modnames = gsub("SEASON", "Year", Modnames),
+         Modnames = gsub("hatch", "Hatch date", Modnames),
+         Modnames = gsub("crmass", "Creching mass", Modnames),
+         Modnames = gsub("crtib", "Creching tibiotarsus", Modnames),
+         Modnames = gsub("crflip", "Creching flipper", Modnames)
+         )
+
+flextable(aic_beta_table) %>% 
+  add_header_row(values = c("", "Estimated coefficients (95% CI)", ""), colwidths = c(1, 3, 1)) %>% 
+  set_header_labels(Modnames = "Model structure",
+                    growth = "Growth rate",
+                    DeltaQAICc = "\u0394 QAICc"
+                    ) %>% 
+  border_remove() %>% 
+  border(i = 1, border.top = fp_border(color = "black"), part = "header") %>% # header top border
+  border(i = 1, j = 2:4, border.bottom = fp_border(color = "black"), part = "header") %>% # coefs cols border bottom
+  border(i = 2, border.bottom = fp_border(color = "black"), part = "header") %>% # header border bottom
+  border(i = nrow(aic_beta_table), border.bottom = fp_border(color = "black"), part = "body") %>% # mass top sub border
+  width(1, width = 2.6) %>% 
+  width(2:4, width = 1.6) %>% 
+  width(5, width = 0.6) %>% 
+  fit_to_width(max_width = 7.5) %>% 
+  align(j = 2:5, align = "center", part = "all") %>% 
+  colformat_md() %>% 
+  footnote(i = 1, j = 2, part = "header", value = as_paragraph(paste("Values for main and quadratic time effects not shown."))) %>% 
   fontsize(size = 9, part = "all")
 
 ```

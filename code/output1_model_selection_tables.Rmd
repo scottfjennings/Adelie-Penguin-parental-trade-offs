@@ -60,7 +60,7 @@ fix_cr_siz_mod_names <- function(zmod.table) {
          Modnames = gsub("sex", "Sex", Modnames),
          Modnames = gsub("year", "Year", Modnames),
          Modnames = gsub("hatch", "Hatch date", Modnames),
-         Modnames = gsub("age", "Age", Modnames),
+         Modnames = gsub("age", "Creching age", Modnames),
          Modnames = gsub("int", "Intercept only", Modnames))
 }
 
@@ -77,7 +77,7 @@ out_table <- rbind(
 
 flextable(out_table) %>% 
     set_header_labels(Modnames = "Model structure",
-                    Delta_AICc = "\u0394 QAICc",
+                    Delta_AICc = "\u0394 AICc",
                     AICcWt = "AICc wt",
                     Neg2LnL = "-2lnL") %>% 
   align(j = 2:5, align = "center", part = "all") %>% 
@@ -101,8 +101,8 @@ fix_survival_mod_names <- function(mod.table) {
            mod.name = gsub("Time", "T", mod.name),
            mod.name = gsub("time", "t", mod.name),
            mod.name = gsub("in.cr", "Creched", mod.name),
-           mod.name = gsub("res.htch + I(res.htch^2)", "Hatch2", mod.name, fixed = TRUE),
-           mod.name = gsub("res.htch", "Hatch", mod.name),
+           mod.name = gsub("res.htch + I(res.htch^2)", "Hatch date2", mod.name, fixed = TRUE),
+           mod.name = gsub("res.htch", "Hatch date", mod.name),
            mod.name = gsub("1", "Intercept only", mod.name),
            mod.name = gsub("mass.gr", "Mass growth", mod.name),
            mod.name = gsub("tib.gr", "Tibiotarsus growth", mod.name),
@@ -137,22 +137,7 @@ cr_timing_out_table(
 
 ```
 
-Table S2. Model selection results for determining the best model structure for estimating the mass that Adélie Penguin chicks entered the creche stage at Cape Crozier, Ross Island, Antarctica, 2012-2013. 
-```{r}
-cr_timing_out_table(
-  readRDS(here("fitted_models/cr_timing/cr_mass_step1_mods")) %>%
-    cr_timing_in_table() %>%
-    fix_cr_siz_mod_names() %>%
-    mutate(Modnames = gsub("growth", "Mass growth", Modnames)),
-  readRDS(here("fitted_models/cr_timing/cr_mass_step2_mods")) %>%
-    cr_timing_in_table() %>%
-    fix_cr_siz_mod_names() %>%
-    mutate(Modnames = gsub("growth", "Mass growth", Modnames))
-)
-```
-
-
-Table S3. Model selection results for determining the best model structure for estimating the flipper length that Adélie Penguin chicks entered the creche stage at Cape Crozier, Ross Island, Antarctica, 2012-2013. 
+Table S2. Model selection results for determining the best model structure for estimating the flipper length that Adélie Penguin chicks entered the creche stage at Cape Crozier, Ross Island, Antarctica, 2012-2013. 
 ```{r}
 cr_timing_out_table(
   readRDS(here("fitted_models/cr_timing/cr_flip_step1_mods")) %>% 
@@ -169,7 +154,7 @@ cr_timing_out_table(
 
 ```
 
-Table S4. Model selection results for determining the best model structure for estimating the tibiotarsus length that Adélie Penguin chicks entered the creche stage at Cape Crozier, Ross Island, Antarctica, 2012-2013. 
+Table S3. Model selection results for determining the best model structure for estimating the tibiotarsus length that Adélie Penguin chicks entered the creche stage at Cape Crozier, Ross Island, Antarctica, 2012-2013. 
 ```{r}
 cr_timing_out_table(
   readRDS(here("fitted_models/cr_timing/cr_tib_step1_mods")) %>% 
@@ -184,6 +169,20 @@ readRDS(here("fitted_models/cr_timing/cr_tib_step2_mods")) %>%
 
 
 
+```
+
+Table S4. Model selection results for determining the best model structure for estimating the mass that Adélie Penguin chicks entered the creche stage at Cape Crozier, Ross Island, Antarctica, 2012-2013. 
+```{r}
+cr_timing_out_table(
+  readRDS(here("fitted_models/cr_timing/cr_mass_step1_mods")) %>%
+    cr_timing_in_table() %>%
+    fix_cr_siz_mod_names() %>%
+    mutate(Modnames = gsub("growth", "Mass growth", Modnames)),
+  readRDS(here("fitted_models/cr_timing/cr_mass_step2_mods")) %>%
+    cr_timing_in_table() %>%
+    fix_cr_siz_mod_names() %>%
+    mutate(Modnames = gsub("growth", "Mass growth", Modnames))
+)
 ```
 
 
@@ -214,7 +213,7 @@ p_modtable %>%
                     Neg2LnL = "-2lnL") %>% 
   align(j = 2:5, align = "center", part = "all") %>% 
   autofit() %>% 
-  footnote(i = 1, j = 1, part = "header", value = as_paragraph(paste("\u03D5 structure =", saturated_phi[[1]])))%>%
+  footnote(i = 1, j = 1, part = "header", value = as_paragraph(paste("\u03D5 structure =", saturated_phi[[1]]))) %>%
   colformat_md()
 
 ```
