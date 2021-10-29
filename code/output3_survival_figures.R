@@ -139,7 +139,7 @@ pred_se <- rbind(f12_se, f13_se, m12_se, m13_se) %>%
 #
 # Figure 1: base survival ----
 # read model averaged estimates from CH4_base_survival.R
-step2_mod_av <- readRDS(here("fitted_models/survival/overall_survival_step2_mod_av_phi"))
+step2_mod_av <- readRDS(here("fitted_models/survival/step2_mod_av_phi"))
 
 # no cohort effects, all estimates equal for each cohort, so just take estimates for first cohort
 step2_mod_av_est <- filter(step2_mod_av$estimates, occ.cohort == 1)

@@ -65,35 +65,109 @@ penguins <- penguins %>%
 penguins.process = process.data(penguins, model = "CJS", groups = c("SEASON", "sex"), begin.time = 50) 
 penguins.ddl = make.design.data(penguins.process)
 
-growth_effect_pims <- penguins.ddl$Phi
-
-# best model for overall survival is Phi(~SEASON + res.htch + Time + I(Time^2))p(~SEASON + time)
+# growth_effect_pims <- penguins.ddl$Phi
 
 
 
-run.phi.model<-function(phi.stru) {
-mark(penguins.process, penguins.ddl, model.parameters = list(Phi = phi.stru, p = list(formula = ~SEASON + time)), output = FALSE, chat = 1.25)
+run.models<-function(phi.stru, p.stru = "SEASON * sex + time") {
+  phi.stru.list <- list(formula = formula(paste("~", phi.stru)))
+  p.stru.list <- list(formula = formula(paste("~", p.stru)))
+zmod <- mark(penguins.process, penguins.ddl, model.parameters = list(Phi = phi.stru.list, p = p.stru.list), output = FALSE, chat = 1.25)
+return(zmod)
 }
 
 
+
+
 # evaluating effect of growth rates on survival
-# comparing models with growth rates only to those with growth rates and the best structure form the final step of overall survival modeling:
-# ~SEASON * sex + res.htch + Time			 	
-Phi.massgr = run.phi.model(list(formula = ~mass.gr))
-Phi.flipgr = run.phi.model(list(formula = ~flip.gr))
-Phi.tibgr = run.phi.model(list(formula = ~tib.gr))
-Phi.SEASON_hatch_TT_massgr = run.phi.model(list(formula = ~ SEASON + res.htch + Time + I(Time^2) + mass.gr))
-Phi.SEASON_hatch_TT_flipgr = run.phi.model(list(formula = ~ SEASON + res.htch + Time + I(Time^2) + flip.gr))
-Phi.SEASON_hatch_TT_tibgr = run.phi.model(list(formula = ~ SEASON + res.htch + Time + I(Time^2) + tib.gr))
-Phi.SEASON_hatch_TT = run.phi.model(list(formula = ~ SEASON + res.htch + Time + I(Time^2))) #best from overall survival
-Phi.dot = run.phi.model(list(formula = ~1))
 
-growth_surv_models = collect.models(lx=c("Phi.massgr", "Phi.flipgr", "Phi.tibgr", "Phi.SEASON_hatch_TT_massgr", "Phi.SEASON_hatch_TT_flipgr", "Phi.SEASON_hatch_TT_tibgr", "Phi.SEASON_hatch_TT", "Phi.dot"))
+# helper code to generate actual model fitting code ----
+step1.3mods <- readRDS(here("fitted_models/survival/step1.3"))
 
-model.table(growth_surv_models)
+step4_cand_set_base <- step1.3mods %>% 
+  model.table() %>% 
+  data.frame() %>%
+  rownames_to_column("mod.num") %>% 
+  filter(DeltaQAICc <= 5) %>% 
+  left_join(., names(step1.3mods) %>%
+              data.frame() %>%
+              rownames_to_column("mod.num") %>%
+              rename(mod.name = 2)) %>% 
+  select(mod.name, Phi, DeltaQAICc) %>% 
+  mutate(Phi = gsub("~", "", Phi))
+
+# best from step 1.3 - need to refit these models to the new data (can't just use the step 1.3 models)
+step4_cand_set_base %>% 
+  mutate(mod.assign = paste(mod.name, " <- run.models(phi.stru = \"", Phi, "\")", sep = "")) %>%  
+  select(mod.assign)
+# now adding in time varying variables. these always need to have time, either time+ or time:
+# best from step 1.3 plus additive mass growth rate
+step4_cand_set_base %>% 
+  mutate(mod.assign = paste(gsub("_p.", "_massgr_p.", mod.name), " <- run.models(phi.stru = \"", Phi, " + mass.gr\")", sep = "")) %>% 
+  select(mod.assign) 
+# best from step 1.3 plus additive flipper growth
+step4_cand_set_base %>% 
+  mutate(mod.assign = paste(gsub("_p.", "_flipgr_p.", mod.name), " <- run.models(phi.stru = \"", Phi, " + flip.gr\")", sep = "")) %>% 
+  select(mod.assign)
+# best from step 1.3 plus additive tibiotarsus growth
+step4_cand_set_base %>% 
+  mutate(mod.assign = paste(gsub("_p.", "_tibgr_p.", mod.name), " <- run.models(phi.stru = \"", Phi, " + tib.gr\")", sep = "")) %>% 
+  select(mod.assign)
+
+# make code for collect.models call
+rbind(step4_cand_set_base %>% 
+  select(mod.name),
+# now adding in time varying variables. these always need to have time, either time+ or time:
+# best from step 1.3 plus additive time and time varying creched.	#same intercept, diff slope for in.cr
+data.frame(mod.name = "#massgr"),
+step4_cand_set_base %>% 
+  mutate(mod.name = gsub("_p.", "_massgr_p.", mod.name)) %>% 
+  select(mod.name),
+# best from step 1.3 plus additive time and time varying age. same intercept, diff slope for dayold
+data.frame(mod.name = "#flipgr"),
+step4_cand_set_base %>% 
+  mutate(mod.name = gsub("_p.", "_flipgr_p.", mod.name)) %>% 
+  select(mod.name),
+# best from step 1.3 plus interaction of time and time varying creched.	#same slope, diff intercept for in.cr
+data.frame(mod.name = "#tibgr"),
+step4_cand_set_base %>% 
+  mutate(mod.name = gsub("_p.", "_tibgr_p.", mod.name)) %>% 
+  select(mod.name)) %>% 
+  summarise(collect.call = paste(mod.name, collapse = "\", \""))
+
+# fitting models ----
+# best step1.3
+phi.year_TT_hatch_p.sat <- run.models(phi.stru = "SEASON + Time + I(Time^2) + res.htch")
+phi.year_T_hatch_p.sat <- run.models(phi.stru = "SEASON + Time + res.htch")
+phi.year_hatch_p.sat <- run.models(phi.stru = "SEASON + res.htch")
+# best step1.3 plus mass growth
+phi.year_TT_hatch_massgr_p.sat <- run.models(phi.stru = "SEASON + Time + I(Time^2) + res.htch + mass.gr")
+phi.year_T_hatch_massgr_p.sat <- run.models(phi.stru = "SEASON + Time + res.htch + mass.gr")
+phi.year_hatch_massgr_p.sat <- run.models(phi.stru = "SEASON + res.htch + mass.gr")
+# best step1.3 plus flipper growth
+phi.year_TT_hatch_flipgr_p.sat <- run.models(phi.stru = "SEASON + Time + I(Time^2) + res.htch + flip.gr")
+phi.year_T_hatch_flipgr_p.sat <- run.models(phi.stru = "SEASON + Time + res.htch + flip.gr")
+phi.year_hatch_flipgr_p.sat <- run.models(phi.stru = "SEASON + res.htch + flip.gr")
+# best step1.3 plus tibiotarsus growth
+phi.year_TT_hatch_tibgr_p.sat <- run.models(phi.stru = "SEASON + Time + I(Time^2) + res.htch + tib.gr")
+phi.year_T_hatch_tibgr_p.sat <- run.models(phi.stru = "SEASON + Time + res.htch + tib.gr")
+phi.year_hatch_tibgr_p.sat <- run.models(phi.stru = "SEASON + res.htch + tib.gr")
 
 
-saveRDS(growth_surv_models, here("fitted_models/survival/growth_surv_models"))
+step4_growth_surv <- collect.models(lx = c("phi.year_TT_hatch_p.sat", "phi.year_T_hatch_p.sat", "phi.year_hatch_p.sat", 
+                                           #massgr
+                                           "phi.year_TT_hatch_massgr_p.sat", "phi.year_T_hatch_massgr_p.sat", "phi.year_hatch_massgr_p.sat",
+                                           #flipgr
+                                           "phi.year_TT_hatch_flipgr_p.sat", "phi.year_T_hatch_flipgr_p.sat", "phi.year_hatch_flipgr_p.sat",
+                                           #tibgr
+                                           "phi.year_TT_hatch_tibgr_p.sat", "phi.year_T_hatch_tibgr_p.sat", "phi.year_hatch_tibgr_p.sat"))
+
+
+model.table(step4_growth_surv) %>% 
+  select(-model)
+
+
+saveRDS(step4_growth_surv, here("fitted_models/survival/step4_growth_surv"))
 
 
 # growth_surv_models <- readRDS(here("fitted_models/survival/growth_surv_models"))

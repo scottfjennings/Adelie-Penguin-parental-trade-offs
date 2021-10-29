@@ -26,12 +26,13 @@ library(RMark)
 ```{r}
 
 cr_timing_in_table <- function(zmod.list) {
-mod_table <- zmod.list %>%  
-  aictab() %>% 
-  data.frame()  %>% 
-  mutate(Neg2LnL = -2 * LL)%>% 
+mod_table <- zmod.list$model.table %>% 
+  data.frame() %>% 
+  mutate(Neg2LnL = -2 * LL,
+         Delta_AICc = ifelse(Delta_AICc == 0, AICc, Delta_AICc)) %>% 
   select(Modnames, K, Delta_AICc, AICcWt, Neg2LnL) %>% 
   mutate(across(.cols = c(Delta_AICc, AICcWt, Neg2LnL),  ~format(round(., 2), nsmall = 2)))
+return(mod_table)
 }
 
 fix_cr_age_mod_names <- function(zmod.table) {
@@ -39,28 +40,29 @@ fix_cr_age_mod_names <- function(zmod.table) {
   mutate(Modnames = gsub("\\.", " * ", Modnames),
          Modnames = gsub("_", " + ", Modnames),
          Modnames = gsub("sex", "Sex", Modnames),
-         Modnames = gsub("year", "Year", Modnames),
-         Modnames = gsub("hatch", "Hatch date", Modnames),
-         Modnames = gsub("mass", "Mass growth", Modnames),
-         Modnames = gsub("tib", "Tibiotarsus growth", Modnames),
-         Modnames = gsub("flip", "Flipper growth", Modnames),
+         Modnames = gsub("year", "Yr", Modnames),
+         Modnames = gsub("hatch", "Hatch", Modnames),
+         Modnames = gsub("mass", "Mass", Modnames),
+         Modnames = gsub("tib", "Tibio", Modnames),
+         Modnames = gsub("flip", "Flipper", Modnames),
          Modnames = gsub("int", "Intercept only", Modnames)
          )
+  return(zmod.table)
 }
 
 
 
 fix_cr_siz_mod_names <- function(zmod.table) {
   zmod.table <- zmod.table %>% 
-  mutate(Modnames = gsub("mass.", "", Modnames),
-         Modnames = gsub("tib.", "", Modnames),
-         Modnames = gsub("flip.", "", Modnames),
+  mutate(Modnames = gsub("mass", "Mass", Modnames),
+         Modnames = gsub("tib", "Tibio", Modnames),
+         Modnames = gsub("flip", "Flip", Modnames),
          Modnames = gsub("\\.", " * ", Modnames),
          Modnames = gsub("_", " + ", Modnames),
          Modnames = gsub("sex", "Sex", Modnames),
-         Modnames = gsub("year", "Year", Modnames),
-         Modnames = gsub("hatch", "Hatch date", Modnames),
-         Modnames = gsub("age", "Creching age", Modnames),
+         Modnames = gsub("year", "Yr", Modnames),
+         Modnames = gsub("hatch", "Hatch", Modnames),
+         Modnames = gsub("age", "Cr age", Modnames),
          Modnames = gsub("int", "Intercept only", Modnames))
 }
 
@@ -85,7 +87,8 @@ flextable(out_table) %>%
   border(i = 1 + nrow(step1_tab), border.bottom = fp_border(color = "black"), part = "body") %>% # step 2 top border
   border(i = 2 + nrow(step1_tab), j = 1, border.bottom = fp_border(color = "black"), part = "body") %>% # step 2 sub border
   autofit() %>% 
-  colformat_md()
+  colformat_md() %>% 
+  footnote(i = 1, j = 3, part = "header", value = as_paragraph("AICc value shown for best models."))
 }
 
 
@@ -94,24 +97,24 @@ fix_survival_mod_names <- function(mod.table) {
     mutate(mod.name = gsub("~", "", mod.name),
            #mod.name = gsub("\\(", "", mod.name),
            #mod.name = gsub("\\)", "", mod.name),
-           mod.name = gsub("SEASON", "Year", mod.name),
+           mod.name = gsub("SEASON", "Yr", mod.name),
            mod.name = gsub("sex", "Sex", mod.name),
            mod.name = gsub("Time + I(Time^2)", "TT", mod.name, fixed = TRUE),
            mod.name = gsub("log(Time + 1)", "lnT", mod.name, fixed = TRUE),
            mod.name = gsub("Time", "T", mod.name),
            mod.name = gsub("time", "t", mod.name),
-           mod.name = gsub("in.cr", "Creched", mod.name),
-           mod.name = gsub("res.htch + I(res.htch^2)", "Hatch date2", mod.name, fixed = TRUE),
-           mod.name = gsub("res.htch", "Hatch date", mod.name),
+           mod.name = gsub("in.cr", "Crèched", mod.name),
+           mod.name = gsub("res.htch + I(res.htch^2)", "Hatch2", mod.name, fixed = TRUE),
+           mod.name = gsub("res.htch", "Hatch", mod.name),
            mod.name = gsub("1", "Intercept only", mod.name),
-           mod.name = gsub("mass.gr", "Mass growth", mod.name),
-           mod.name = gsub("tib.gr", "Tibiotarsus growth", mod.name),
-           mod.name = gsub("flip.gr", "Flipper growth", mod.name),
-           mod.name = gsub("did.cr", "Creched", mod.name),
-           mod.name = gsub("cr.mass", "Creching mass", mod.name),
-           mod.name = gsub("cr.flip", "Creching flipper", mod.name),
-           mod.name = gsub("cr.tib", "Creching tibiotarsus", mod.name),
-           mod.name = gsub("cr.age", "Creching age", mod.name),
+           mod.name = gsub("mass.gr", "Mass", mod.name),
+           mod.name = gsub("tib.gr", "Tibio", mod.name),
+           mod.name = gsub("flip.gr", "Flipper", mod.name),
+          # mod.name = gsub("did.cr", "Crèched", mod.name),
+           mod.name = gsub("cr.mass", "Cr mass", mod.name),
+           mod.name = gsub("cr.flip", "Cr flipper", mod.name),
+           mod.name = gsub("cr.tib", "Cr tibio", mod.name),
+           mod.name = gsub("cr.age", "Cr age", mod.name),
            mod.name = gsub("dayold", "Age", mod.name)) %>% 
     mutate(mod.name = stringr::str_replace_all(mod.name, "([2-9]+)", "^\\1^"))
   
@@ -120,13 +123,17 @@ fix_survival_mod_names <- function(mod.table) {
 
 ```
 
-Table S1. Model selection results for determining the best model structure for estimating the age that Adélie Penguin chicks entered the creche stage at Cape Crozier, Ross Island, Antarctica, 2012-2013. 
+Table S1. Model selection results for determining the best model structure for estimating the age that Adélie Penguin chicks entered the crèche stage at Cape Crozier, Ross Island, Antarctica, 2012-2013.  In step 1 we determined the best supported structure among the variables not directly related to our questions: years (Yr), males vs. females (Sex), and relative chick hatch date (Hatch). In step 2 we took all step 1 models with `r knitr::asis_output("\u0394")` AICc < 5 and no uninformative parameters (models with uninformative parameters indicated with `r knitr::asis_output("\u2020")`) and added structure to represent the variables directly related to our questions: growth rate in mass (g; Mass), flipper length (mm; Flipper), and tibiotarsus length (mm; Tibio). Shown for each model are the difference between model Akaike Information Criterion adjusted for small sample sizes (AICc) and the lowest AICc in the model set (ΔAICc), the number of parameters (K), Akaike weights (AICc wt), and the -2 loglikelihood (-2lnL). 
 ```{r}
 
 cr_timing_out_table(
   readRDS(here("fitted_models/cr_timing/cr_age_step1_mods")) %>%
     cr_timing_in_table() %>%
-    fix_cr_age_mod_names(),
+    full_join(., readRDS(here("fitted_models/cr_timing/cr_age_step1_uninformative")) %>% rename(Modnames = mod.name))  %>% 
+    mutate(uninformative = ifelse(is.na(uninformative), 0, 1)) %>% 
+    fix_cr_age_mod_names() %>% 
+    mutate(Modnames = ifelse(uninformative == 1, paste(Modnames, " \u2020", sep = ""), Modnames)) %>% 
+    select(-uninformative),
   readRDS(here("fitted_models/cr_timing/cr_age_step2_mods")) %>%
     cr_timing_in_table() %>%
     fix_cr_age_mod_names()
@@ -137,223 +144,300 @@ cr_timing_out_table(
 
 ```
 
-Table S2. Model selection results for determining the best model structure for estimating the flipper length that Adélie Penguin chicks entered the creche stage at Cape Crozier, Ross Island, Antarctica, 2012-2013. 
+Table S2. Model selection results for determining the best model structure for estimating the flipper length that Adélie Penguin chicks entered the crèche stage at Cape Crozier, Ross Island, Antarctica, 2012-2013. In step 1 we determined the best supported structure among the variables not directly related to our questions: years (Yr), males vs. females (Sex), and relative chick hatch date (Hatch). In step 2 we took all step 1 models with `r knitr::asis_output("\u0394")` AICc < 5 and no uninformative parameters (models with uninformative parameters indicated with `r knitr::asis_output("\u2020")`) and added structure to represent the variables directly related to our questions:  Crèching age (Cr age) and growth rate in flipper length (mm; Flipper).  Shown for each model are the difference between model Akaike Information Criterion adjusted for small sample sizes (AICc) and the lowest AICc in the model set (ΔAICc), the number of parameters (K), Akaike weights (AICc wt), and the -2 loglikelihood (-2lnL). 
 ```{r}
 cr_timing_out_table(
   readRDS(here("fitted_models/cr_timing/cr_flip_step1_mods")) %>% 
     cr_timing_in_table() %>% 
+    full_join(., readRDS(here("fitted_models/cr_timing/cr_flip_step1_uninformative")) %>% rename(Modnames = mod.name))  %>% 
+    mutate(uninformative = ifelse(is.na(uninformative), 0, 1)) %>% 
     fix_cr_siz_mod_names() %>% 
-    mutate(Modnames = gsub("growth", "Mass growth", Modnames)),
+    mutate(Modnames = ifelse(uninformative == 1, paste(Modnames, " \u2020", sep = ""), Modnames)) %>% 
+    select(-uninformative),
   readRDS(here("fitted_models/cr_timing/cr_flip_step2_mods")) %>% 
     cr_timing_in_table() %>% 
     fix_cr_siz_mod_names() %>% 
-    mutate(Modnames = gsub("growth", "Flipper growth", Modnames))
+    mutate(Modnames = gsub("growth", "Flipper", Modnames))
 )
 
 
 
 ```
 
-Table S3. Model selection results for determining the best model structure for estimating the tibiotarsus length that Adélie Penguin chicks entered the creche stage at Cape Crozier, Ross Island, Antarctica, 2012-2013. 
+Table S3. Model selection results for determining the best model structure for estimating the tibiotarsus length that Adélie Penguin chicks entered the crèche stage at Cape Crozier, Ross Island, Antarctica, 2012-2013. In step 1 we determined the best supported structure among the variables not directly related to our questions: years (Yr), males vs. females (Sex), and relative chick hatch date (Hatch). In step 2 we took all step 1 models with `r knitr::asis_output("\u0394")` AICc < 5 and no uninformative parameters (models with uninformative parameters indicated with `r knitr::asis_output("\u2020")`) and added structure to represent the variables directly related to our questions:  Crèching age (Cr age) and growth rate in tibiotarsus length (mm; Tibio). Shown for each model are the difference between model Akaike Information Criterion adjusted for small sample sizes (AICc) and the lowest AICc in the model set (ΔAICc), the number of parameters (K), Akaike weights (AICc wt), and the -2 loglikelihood (-2lnL). 
 ```{r}
 cr_timing_out_table(
   readRDS(here("fitted_models/cr_timing/cr_tib_step1_mods")) %>% 
   cr_timing_in_table() %>% 
+    full_join(., readRDS(here("fitted_models/cr_timing/cr_tib_step1_uninformative")) %>% rename(Modnames = mod.name))  %>% 
+    mutate(uninformative = ifelse(is.na(uninformative), 0, 1)) %>%
   fix_cr_siz_mod_names() %>% 
-  mutate(Modnames = gsub("growth", "Tibiotarsus growth", Modnames)),
+    mutate(Modnames = ifelse(uninformative == 1, paste(Modnames, " \u2020", sep = ""), Modnames)) %>% 
+    select(-uninformative),
 readRDS(here("fitted_models/cr_timing/cr_tib_step2_mods")) %>% 
   cr_timing_in_table() %>% 
   fix_cr_siz_mod_names() %>% 
-  mutate(Modnames = gsub("growth", "Tibiotarsus growth", Modnames))
+  mutate(Modnames = gsub("growth", "Tibio", Modnames))
 )
 
 
 
 ```
 
-Table S4. Model selection results for determining the best model structure for estimating the mass that Adélie Penguin chicks entered the creche stage at Cape Crozier, Ross Island, Antarctica, 2012-2013. 
+Table S4. Model selection results for determining the best model structure for estimating the mass that Adélie Penguin chicks entered the crèche stage at Cape Crozier, Ross Island, Antarctica, 2012-2013. In step 1 we determined the best supported structure among the variables not directly related to our questions: years (Yr), males vs. females (Sex), and relative chick hatch date (Hatch). In step 2 we took all step 1 models with `r knitr::asis_output("\u0394")` AICc < 5 and no uninformative parameters (models with uninformative parameters indicated with `r knitr::asis_output("\u2020")`) and added structure to represent the variables directly related to our questions:  Crèching age (Cr age) and mass growth rate (g; Mass). Shown for each model are the difference between model Akaike Information Criterion adjusted for small sample sizes (AICc) and the lowest AICc in the model set (ΔAICc), the number of parameters (K), Akaike weights (AICc wt), and the -2 loglikelihood (-2lnL). 
 ```{r}
 cr_timing_out_table(
   readRDS(here("fitted_models/cr_timing/cr_mass_step1_mods")) %>%
     cr_timing_in_table() %>%
-    fix_cr_siz_mod_names() %>%
-    mutate(Modnames = gsub("growth", "Mass growth", Modnames)),
+    full_join(., readRDS(here("fitted_models/cr_timing/cr_mass_step1_uninformative")) %>% rename(Modnames = mod.name))  %>% 
+    mutate(uninformative = ifelse(is.na(uninformative), 0, 1)) %>%
+    fix_cr_siz_mod_names() %>% 
+    mutate(Modnames = ifelse(uninformative == 1, paste(Modnames, " \u2020", sep = ""), Modnames)) %>% 
+    select(-uninformative),
   readRDS(here("fitted_models/cr_timing/cr_mass_step2_mods")) %>%
     cr_timing_in_table() %>%
     fix_cr_siz_mod_names() %>%
-    mutate(Modnames = gsub("growth", "Mass growth", Modnames))
+    mutate(Modnames = gsub("growth", "Mass", Modnames))
 )
 ```
 
 
-Table S5. Model selection results for determining the best model structure for estimating resighting probabilities of Adélie Penguin chicks during the entire chick-provisioning period at Cape Crozier, Ross Island, Antarctica, 2012-2013. 
+Table S5. Model selection results for estimating underlying patterns of resighting and survival probabilities of Adélie Penguin chicks (n = 112) during the entire chick-provisioning period at Cape Crozier, Ross Island, Antarctica, 2012-2013. In this stage of model selection we considered variables which we thought might influence survival probability but which were not directly related to our research questions: variation by year (YR), males vs. females (Sex), crèche status on each day (brood/guard stage vs. crèched; Crèched; resighting probability only), and within season temporal variation including general variation (t), linear (T), pseudo-threshold (lnT) and quadratic (TT) patterns. We separately estimated the best p (A) and `r knitr::asis_output("\u03D5")` (B) structures, holding the `r knitr::asis_output("\u03D5")` and p, respectively, at the most saturated structure. Then we took all models with `r knitr::asis_output("\u0394")` QAICc < 5 and no uninformative parameters (models with uninformative parameters indicated with `r knitr::asis_output("\u2020")`) from both of those candidate sets and compared them in the final step (C). Shown for each model are the difference between model Akaike Information Criterion adjusted for small sample sizes and overdispersion (QAICc) and the lowest QAICc in the model set (ΔQAICc), the number of parameters (K), Akaike weights (QAICc wt), and deviance adjusted for overdispersion (QDeviance). 
 
 ```{r}
 
 
-p_modtable <- readRDS(here("fitted_models/survival/p_models")) %>% 
-  model.table(use.lnl=TRUE) 
-
-
-saturated_phi = distinct(p_modtable, Phi) %>% 
-  rename(mod.name = Phi) %>% 
-  fix_survival_mod_names()
-
-p_modtable %>% 
-  select(mod.name = p, npar, DeltaQAICc, weight, Neg2LnL) %>% 
+p_modtable <- readRDS(here("fitted_models/survival/step1.1_p")) %>% 
+  model.table(model.name = FALSE) %>% 
+    mutate(DeltaQAICc = ifelse(DeltaQAICc == 0, QAICc, DeltaQAICc)) %>% 
+    mutate(DeltaQAICc = ifelse(DeltaQAICc == 0, QAICc, DeltaQAICc)) %>% 
+  full_join(., readRDS(here("fitted_models/survival/step1.1_uninformative")) %>% rename(model = mod.name)) %>% 
+    mutate(uninformative = ifelse(is.na(uninformative), 0, 1)) %>%
+  select(mod.name = p, npar, DeltaQAICc, weight, QDeviance, uninformative) %>% 
   mutate(DeltaQAICc = round(DeltaQAICc, 3),
          weight = round(weight, 3),
-         Neg2LnL = round(Neg2LnL, 3)) %>% 
+         QDeviance = round(QDeviance, 3)) %>% 
   fix_survival_mod_names() %>% 
+    mutate(mod.name = ifelse(uninformative == 1, paste(mod.name, " \u2020", sep = ""), mod.name)) %>% 
+    select(-uninformative)
+
+
+
+
+phi_modtable <- readRDS(here("fitted_models/survival/step1.2_phi")) %>% 
+  model.table(model.name = FALSE) %>% 
+    mutate(DeltaQAICc = ifelse(DeltaQAICc == 0, QAICc, DeltaQAICc)) %>% 
+    mutate(DeltaQAICc = ifelse(DeltaQAICc == 0, QAICc, DeltaQAICc)) %>%  
+  full_join(., readRDS(here("fitted_models/survival/step1.2_uninformative")) %>% rename(model = mod.name)) %>% 
+    mutate(uninformative = ifelse(is.na(uninformative), 0, 1)) %>%
+  select(mod.name = Phi, npar, DeltaQAICc, weight, QDeviance, uninformative) %>% 
+  mutate(DeltaQAICc = round(DeltaQAICc, 3),
+         weight = round(weight, 3),
+         QDeviance = round(QDeviance, 3)) %>% 
+  fix_survival_mod_names() %>% 
+    mutate(mod.name = ifelse(uninformative == 1, paste(mod.name, " \u2020", sep = ""), mod.name)) %>% 
+    select(-uninformative)
+
+p_phi_modtable <- readRDS(here("fitted_models/survival/step1.3")) %>% 
+  model.table() %>% 
+    mutate(DeltaQAICc = ifelse(DeltaQAICc == 0, QAICc, DeltaQAICc)) %>% 
+  select(mod.name = model, npar, DeltaQAICc, weight, QDeviance) %>% 
+  mutate(mod.name = gsub("Phi", "\u03D5", mod.name),
+         mod.name = gsub("p", " p", mod.name),
+         DeltaQAICc = round(DeltaQAICc, 3),
+         weight = round(weight, 3),
+         QDeviance = round(QDeviance, 3)) %>% 
+  fix_survival_mod_names()
+
+
+
+rbind(data.frame(mod.name = "A. Determining p structure (\u03D5 structure: Year * Sex + t)", npar = "", DeltaQAICc = "", weight = "", QDeviance = ""),
+      p_modtable,
+      data.frame(mod.name = "B. Determining \u03D5 structure (p structure: Year * Sex + t)", npar = "", DeltaQAICc = "", weight = "", QDeviance = ""),
+      phi_modtable,
+      data.frame(mod.name = "C. Best \u03D5 and p structure from above (\u0394 QAICc < 5)", npar = "", DeltaQAICc = "", weight = "", QDeviance = ""),
+      p_phi_modtable) %>% 
   flextable() %>% 
-  set_header_labels(mod.name = "p model structure",
+  set_header_labels(mod.name = "Model structure",
                     npar = "K",
                     DeltaQAICc = "\u0394 QAICc",
-                    weight = "QAICc wt",
-                    Neg2LnL = "-2lnL") %>% 
+                    weight = "QAICc wt") %>% 
   align(j = 2:5, align = "center", part = "all") %>% 
   autofit() %>% 
-  footnote(i = 1, j = 1, part = "header", value = as_paragraph(paste("\u03D5 structure =", saturated_phi[[1]]))) %>%
+  colformat_md() %>% 
+  border(i = 1, j = 1, border.bottom = fp_border(color = "black"), part = "body") %>% 
+  border(i = nrow(p_modtable) + 1, border.bottom = fp_border(color = "black"), part = "body")%>% 
+  border(i = 1 + nrow(p_modtable) + 1, j = 1, border.bottom = fp_border(color = "black"), part = "body") %>% 
+  border(i = nrow(p_modtable) + 1 + nrow(phi_modtable) + 1, border.bottom = fp_border(color = "black"), part = "body") %>% 
+  border(i = 1 + nrow(p_modtable) + 1 + nrow(phi_modtable) + 1, j = 1, border.bottom = fp_border(color = "black"), part = "body") %>% 
+  footnote(i = 1, j = 3, part = "header", value = as_paragraph("QAICc value shown for best models.")) %>%
   colformat_md()
 
 ```
 <br>
 
-Table S6. Model selection results for the first step in determining the best model structure for estimating survival probabilities of Adélie Penguin chicks at Cape Crozier, Ross Island, Antarctica, 2012-2013. The candidate set in this stage of model selection included model structures to evaluate the relative importance of Year, Sex and relative Hatch date in explaining survival across the entire chick-provisioning period.
+Table S6. Model selection results for determining the effect of chick age and brood vs. guard status on survival probabilities of Adélie Penguin chicks across the entire chick-provisioning period at Cape Crozier, Ross Island, Antarctica, 2012-2013. In this stage of model selection we used all model structures with `r knitr::asis_output("\u0394 QAICc")` < 5 from Table S5C, above as the starting point, and added two time-varying variables to the `r knitr::asis_output("\u03D5")` structure which were directly related to our research questions: chick age on each day (Age) and chick crèche status (brood/guard stage vs. crèched; Crèched). For both of these, we considered two forms of time-variation: same intercept, different slope t + ...; and different intercept, same slope t:..., where ... indicates either Age or Crèched. Shown for each model are the difference between model Akaike Information Criterion adjusted for small sample sizes and overdispersion (QAICc) and the lowest QAICc in the model set (ΔQAICc), the number of parameters (K), Akaike weights (QAICc wt), and deviance adjusted for overdispersion (QDeviance).
 
 ```{r}
 
 
-phi_step1_modtable <- readRDS(here("fitted_models/survival/overall_survival_step1_models")) %>% 
-  model.table(use.lnl=TRUE) 
+step2_modtable <- readRDS(here("fitted_models/survival/step2")) %>% 
+  model.table() %>% 
+    mutate(DeltaQAICc = ifelse(DeltaQAICc == 0, QAICc, DeltaQAICc))
 
 
-p_stru = distinct(phi_step1_modtable, p) %>% 
-  rename(mod.name = p) %>% 
-  fix_survival_mod_names()
 
-phi_step1_modtable %>% 
-  select(mod.name = Phi, npar, DeltaQAICc, weight, Neg2LnL) %>% 
+step2_modtable %>% 
+  select(mod.name = Phi, npar, DeltaQAICc, weight, QDeviance) %>% 
   mutate(DeltaQAICc = round(DeltaQAICc, 3),
          weight = round(weight, 3),
-         Neg2LnL = round(Neg2LnL, 3)) %>% 
+         QDeviance = round(QDeviance, 3)) %>% 
+  fix_survival_mod_names() %>% 
+  flextable() %>% 
+  set_header_labels(mod.name = "\u03D5 model structure (p structure for all: Year * Sex + t)",
+                    npar = "K",
+                    DeltaQAICc = "\u0394 QAICc",
+                    weight = "QAICc wt") %>% 
+  align(j = 2:5, align = "center", part = "all") %>% 
+  autofit() %>% 
+  footnote(i = 1, j = 3, part = "header", value = as_paragraph("QAICc value shown for best model.")) %>%
+  colformat_md()
+
+```
+
+<br>
+
+Table S7. Model selection results for estimating the effects of growth rates on survival probabilities of Adélie Penguin chicks during the entire chick-provisioning period at Cape Crozier, Ross Island, Antarctica, 2012-2013. Models in this candidate set were built from the model structures with `r knitr::asis_output("\u0394")` QAICc < 5 from Table S5C, above, but all models here were fitted to a subset of the full dataset for chicks which we could estimate growth rate (n = 99). At this stage we added three variables to those `r knitr::asis_output("\u03D5")` structures which were directly related to our research questions: growth rate in mass (g; Mass), flipper length (mm; Flipper), and tibiotarsus length (mm; Tibio). Shown for each model are the difference between model Akaike Information Criterion adjusted for small sample sizes and overdispersion (QAICc) and the lowest QAICc in the model set (ΔQAICc), the number of parameters (K), Akaike weights (QAICc wt), and deviance adjusted for overdispersion (QDeviance).
+
+```{r}
+
+
+step4_modtable <- readRDS(here("fitted_models/survival/step4_growth_surv")) %>% 
+  model.table() %>% 
+    mutate(DeltaQAICc = ifelse(DeltaQAICc == 0, QAICc, DeltaQAICc))
+
+
+
+step4_modtable %>% 
+  select(mod.name = Phi, npar, DeltaQAICc, weight, QDeviance) %>% 
+  mutate(DeltaQAICc = round(DeltaQAICc, 3),
+         weight = round(weight, 3),
+         QDeviance = round(QDeviance, 3)) %>% 
   fix_survival_mod_names() %>% 
   flextable() %>% 
   set_header_labels(mod.name = "\u03D5 model structure",
                     npar = "K",
                     DeltaQAICc = "\u0394 QAICc",
-                    weight = "QAICc wt",
-                    Neg2LnL = "-2lnL") %>% 
+                    weight = "QAICc wt") %>% 
   align(j = 2:5, align = "center", part = "all") %>% 
   autofit() %>% 
-  footnote(i = 1, j = 1, part = "header", value = as_paragraph(paste("p structure =", p_stru[[1]]))) %>%
+  footnote(i = 1, j = 3, part = "header", value = as_paragraph("QAICc value shown for best model.")) %>%
   colformat_md()
 
 ```
 
+
+
 <br>
 
-Table S7. Model selection results for the second step in determining the best model structure for estimating survival probabilities of Adélie Penguin chicks during the entire chick-provisioning period at Cape Crozier, Ross Island, Antarctica, 2012-2013. The candidate set in this stage of model selection included the competitive model structures from the first step (Δ QAICc ≤ 2; see Table S2), and added structures to evaluate time effects on survival across the entire chick-provisioning period.
+Table S8.  Model selection results for estimating underlying patterns of resighting probability and survival of Adélie Penguin chicks during the entire chick-provisioning period at Cape Crozier, Ross Island, Antarctica, 2012-2013. In this stage of model selection we fitted models only to those chicks that reached the crèche stage (n = 84). We considered most of the same model structures as we considered in Table S5 above, except that we excluded crèche status: variation by year (YR), males vs. females (Sex), and within season temporal variation including general variation (t), linear (T), pseudo-threshold (lnT) and quadratic (TT) patterns. We separately estimated the best p (A) and `r knitr::asis_output("\u03D5")` (B) structures, holding the `r knitr::asis_output("\u03D5")` and p, respectively, at the most saturated structure. Then we took all models with `r knitr::asis_output("\u0394")` QAICc < 5 and no uninformative parameters (models with uninformative parameters indicated with `r knitr::asis_output("\u2020")`) from both of those candidate sets and compared them in the final step (C). Shown for each model are the difference between model Akaike Information Criterion adjusted for small sample sizes and overdispersion (QAICc) and the lowest QAICc in the model set (ΔQAICc), the number of parameters (K), Akaike weights (QAICc wt), and deviance adjusted for overdispersion (QDeviance). 
 
 ```{r}
 
 
-phi_step2_modtable <- readRDS(here("fitted_models/survival/overall_survival_step2_models"))%>% 
-  model.table(use.lnl=TRUE) 
-
-
-p_stru = distinct(phi_step2_modtable, p) %>% 
-  rename(mod.name = p) %>% 
-  fix_survival_mod_names()
-
-phi_step2_modtable %>% 
-  select(mod.name = Phi, npar, DeltaQAICc, weight, Neg2LnL) %>% 
+p_modtable_creched <- readRDS(here("fitted_models/survival/step5.1_creched_p")) %>% 
+  model.table(model.name = FALSE) %>% 
+    mutate(DeltaQAICc = ifelse(DeltaQAICc == 0, QAICc, DeltaQAICc)) %>% 
+    mutate(DeltaQAICc = ifelse(DeltaQAICc == 0, QAICc, DeltaQAICc)) %>% 
+  full_join(., readRDS(here("fitted_models/survival/step5.1_uninformative")) %>% rename(model = mod.name)) %>% 
+    mutate(uninformative = ifelse(is.na(uninformative), 0, 1)) %>%
+  select(mod.name = p, npar, DeltaQAICc, weight, QDeviance, uninformative) %>% 
   mutate(DeltaQAICc = round(DeltaQAICc, 3),
          weight = round(weight, 3),
-         Neg2LnL = round(Neg2LnL, 3)) %>% 
+         QDeviance = round(QDeviance, 3)) %>% 
   fix_survival_mod_names() %>% 
-  flextable() %>% 
-  set_header_labels(mod.name = "\u03D5 model structure",
-                    npar = "K",
-                    DeltaQAICc = "\u0394 QAICc",
-                    weight = "QAICc wt",
-                    Neg2LnL = "-2lnL") %>% 
-  align(j = 2:5, align = "center", part = "all") %>% 
-  autofit() %>% 
-  footnote(i = 1, j = 1, part = "header", value = as_paragraph(paste("p structure =", p_stru[[1]])))%>%
-  colformat_md()
+    mutate(mod.name = ifelse(uninformative == 1, paste(mod.name, " \u2020", sep = ""), mod.name)) %>% 
+    select(-uninformative)
 
-```
-
-
-
-<br>
-
-Table S8. Model selection results for determining the the ability of growth rates to explain estimated survival probabilities of Adélie Penguin chicks during the entire chick-provisioning period at Cape Crozier, Ross Island, Antarctica, 2012-2013. The candidate set in this stage of model selection included the best-supported model structure from the second step of estimating survival across entire chick-provisioning period (see Table S3).
-
-```{r}
-
-
-
-growth_surv_modtable <- readRDS(here("fitted_models/survival/growth_surv_models")) %>% 
-  model.table(use.lnl=TRUE) 
-
-
-p_stru = distinct(growth_surv_modtable, p) %>% 
-  rename(mod.name = p) %>% 
-  fix_survival_mod_names()
-
-growth_surv_modtable %>% 
-  select(mod.name = Phi, npar, DeltaQAICc, weight, Neg2LnL) %>% 
+phi_modtable_creched <- readRDS(here("fitted_models/survival/step5.2_creched_phi")) %>% 
+  model.table(model.name = FALSE) %>% 
+    mutate(DeltaQAICc = ifelse(DeltaQAICc == 0, QAICc, DeltaQAICc)) %>% 
+    mutate(DeltaQAICc = ifelse(DeltaQAICc == 0, QAICc, DeltaQAICc)) %>% 
+  full_join(., readRDS(here("fitted_models/survival/step5.2_uninformative")) %>% rename(model = mod.name)) %>% 
+    mutate(uninformative = ifelse(is.na(uninformative), 0, 1)) %>%
+  select(mod.name = Phi, npar, DeltaQAICc, weight, QDeviance, uninformative) %>% 
   mutate(DeltaQAICc = round(DeltaQAICc, 3),
          weight = round(weight, 3),
-         Neg2LnL = round(Neg2LnL, 3)) %>% 
+         QDeviance = round(QDeviance, 3)) %>% 
   fix_survival_mod_names() %>% 
+    mutate(mod.name = ifelse(uninformative == 1, paste(mod.name, " \u2020", sep = ""), mod.name)) %>% 
+    select(-uninformative)
+
+p_phi_modtable_creched <- readRDS(here("fitted_models/survival/step5.3_creched_base")) %>% 
+  model.table() %>% 
+    mutate(DeltaQAICc = ifelse(DeltaQAICc == 0, QAICc, DeltaQAICc)) %>% 
+  select(mod.name = model, npar, DeltaQAICc, weight, QDeviance) %>% 
+  mutate(mod.name = gsub("Phi", "\u03D5", mod.name),
+         mod.name = gsub("p", " p", mod.name),
+         DeltaQAICc = round(DeltaQAICc, 3),
+         weight = round(weight, 3),
+         QDeviance = round(QDeviance, 3)) %>% 
+  fix_survival_mod_names()
+
+
+
+rbind(data.frame(mod.name = "A. Determining p structure (\u03D5 structure: Year * Sex + t)", npar = "", DeltaQAICc = "", weight = "", QDeviance = ""),
+      p_modtable_creched,
+      data.frame(mod.name = "B. Determining \u03D5 structure (p structure: Year * Sex + t)", npar = "", DeltaQAICc = "", weight = "", QDeviance = ""),
+      phi_modtable_creched,
+      data.frame(mod.name = "C. Best \u03D5 and p structure from above (\u0394 QAICc < 5)", npar = "", DeltaQAICc = "", weight = "", QDeviance = ""),
+      p_phi_modtable_creched) %>% 
   flextable() %>% 
-  set_header_labels(mod.name = "\u03D5 model structure",
+  set_header_labels(mod.name = "Model structure",
                     npar = "K",
                     DeltaQAICc = "\u0394 QAICc",
-                    weight = "QAICc wt",
-                    Neg2LnL = "-2lnL") %>% 
+                    weight = "QAICc wt") %>% 
   align(j = 2:5, align = "center", part = "all") %>% 
   autofit() %>% 
-  footnote(i = 1, j = 1, part = "header", value = as_paragraph(paste("p structure =", p_stru[[1]]))) %>%
+  colformat_md() %>% 
+  border(i = 1, j = 1, border.bottom = fp_border(color = "black"), part = "body") %>% 
+  border(i = nrow(p_modtable_creched) + 1, border.bottom = fp_border(color = "black"), part = "body")%>% 
+  border(i = 1 + nrow(p_modtable_creched) + 1, j = 1, border.bottom = fp_border(color = "black"), part = "body") %>% 
+  border(i = nrow(p_modtable_creched) + 1 + nrow(phi_modtable_creched) + 1, border.bottom = fp_border(color = "black"), part = "body") %>% 
+  border(i = 1 + nrow(p_modtable_creched) + 1 + nrow(phi_modtable_creched) + 1, j = 1, border.bottom = fp_border(color = "black"), part = "body") %>% 
+  footnote(i = 1, j = 3, part = "header", value = as_paragraph("QAICc value shown for best models.")) %>%
   colformat_md()
 
 ```
 
 
-
 <br>
 
-Table S9. Model selection results for determining the the ability of creching age or size to explain estimated survival probabilities of Adélie Penguin chicks during the entire chick-provisioning period at Cape Crozier, Ross Island, Antarctica, 2012-2013. The candidate set in this stage of model selection included the best-supported model structure from the second step of estimating survival across entire chick-provisioning period (see Table S3) and from determining the ability of growth rates to explain survival (see Table S4).
+Table S9. Model selection results for estimating the effects of crèching age and size on survival probabilities of Adélie Penguin chicks during the crèche period at Cape Crozier, Ross Island, Antarctica, 2012-2013. Models in this candidate set were built from the model structures with `r knitr::asis_output("\u0394")` QAICc < 5 from Table S8C, above. At this stage we added four variables to those `r knitr::asis_output("\u03D5")` structures which were directly related to our research questions: the age (Cr age), mass (g; Cr mass), flipper length (mm; Cr flipper), and tibiotarsus length (mm; Cr tibio) when each chick entered the crèche stage. Shown for each model are the difference between model Akaike Information Criterion adjusted for small sample sizes and overdispersion (QAICc) and the lowest QAICc in the model set (ΔQAICc), the number of parameters (K), Akaike weights (QAICc wt), and deviance adjusted for overdispersion (QDeviance).
 
 ```{r}
 
 
-cr_age_size_modtable <- readRDS(here("fitted_models/survival/cr_age_size_models")) %>% 
-  model.table(use.lnl=TRUE) 
+cr_age_size_modtable <- readRDS(here("fitted_models/survival/step6_cr_timing_surv")) %>% 
+  model.table() %>% 
+    mutate(DeltaQAICc = ifelse(DeltaQAICc == 0, QAICc, DeltaQAICc))
 
 
-p_stru = distinct(cr_age_size_modtable, p) %>% 
-  rename(mod.name = p) %>% 
-  fix_survival_mod_names()
 
 cr_age_size_modtable %>% 
-  select(mod.name = Phi, npar, DeltaQAICc, weight, Neg2LnL) %>% 
+  select(mod.name = Phi, npar, DeltaQAICc, weight, QDeviance) %>% 
   mutate(DeltaQAICc = round(DeltaQAICc, 3),
          weight = round(weight, 3),
-         Neg2LnL = round(Neg2LnL, 3)) %>% 
+         QDeviance = round(QDeviance, 3)) %>% 
   fix_survival_mod_names() %>% 
   flextable() %>% 
   set_header_labels(mod.name = "\u03D5 model structure",
                     npar = "K",
                     DeltaQAICc = "\u0394 QAICc",
-                    weight = "QAICc wt",
-                    Neg2LnL = "-2lnL") %>% 
+                    weight = "QAICc wt") %>% 
   align(j = 2:5, align = "center", part = "all") %>% 
   autofit() %>% 
-  footnote(i = 1, j = 1, part = "header", value = as_paragraph(paste("p structure =", p_stru[[1]])))%>%
+  footnote(i = 1, j = 3, part = "header", value = as_paragraph("QAICc value shown for best models.")) %>%
   colformat_md()
 
 ```

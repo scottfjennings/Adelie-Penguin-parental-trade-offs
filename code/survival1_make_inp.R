@@ -13,11 +13,10 @@
 library(tidyverse)
 library(here)
 
- 
+# all chicks ----
 ch <- read.csv(here("data/resight.tab.all.csv")) %>% 
   select(-seen) %>% 
   unite(ch, -contains("chick_id"), sep = "")
-
 
 
 ana_table <- readRDS(here("data/ana_table_full")) %>% 
@@ -73,7 +72,7 @@ write.csv(mark_inp, here("data/mark_in.csv"), row.names = FALSE)
 # open the resulting file in notepad++, delete the first line that has only "ch", then do replace all to get rid of all the ".
 # finally, do save as and include ".inp" to the end of the file name to save as .inp
 
-##############################
+# all chicks old ----
 
 # for comparison, read in inp file used for thesis analysis
 
@@ -106,3 +105,47 @@ peng_comp <- anti_join(penguins %>% rownames_to_column("chick_id") %>% select(ch
   full_join(ana_table)
 
 
+# creched chicks only ----
+# here we don't need the time varying individual covs, just the creche size and age covs, plus year, sex and hatch date
+
+ch_long <- read.csv(here("data/resight.tab.all.csv")) %>% 
+  select(-seen) %>% 
+  mutate_all(as.character) %>% 
+  pivot_longer(cols = contains("X"), names_to = "seas.day", values_to = "seen") %>% 
+  mutate(seas.day = gsub("X", "", seas.day))
+
+ana_table_cr <- readRDS(here("data/ana_table_full")) %>% 
+  rename(chick_id = CHICK_ID) %>% 
+  filter(!is.na(cr.age), !is.na(cr.mass), !is.na(cr.tib), !is.na(cr.flip), !is.na(sex))
+
+ch_creched <- ch_long %>% 
+  filter(seas.day >= min(ana_table_cr$cr.seasday)) %>% 
+  right_join(., select(ana_table_cr, chick_id)) %>% 
+  mutate(seas.day = paste("seasday.", seas.day, sep = "")) %>% 
+  pivot_wider(id_cols = "chick_id", values_from = "seen", names_from = "seas.day") %>% 
+  unite(ch, -contains("chick_id"), sep = "") 
+
+
+
+indiv_covs <- ana_table_cr %>% 
+  mutate(m1213 = ifelse(SEASON == 1213 & sex == "M", 1, 0),
+         f1213 = ifelse(SEASON == 1213 & sex == "F", 1, 0),
+         m1314 = ifelse(SEASON == 1314 & sex == "M", 1, 0),
+         f1314 = ifelse(SEASON == 1314 & sex == "F", 1, 0)) %>% 
+  select(chick_id, m1213, f1213, m1314, f1314, resid.hatch, cr.age, cr.mass, cr.flip, cr.tib) %>% 
+  mutate(resid.hatch = round(resid.hatch, 1),
+         cr.mass = round(cr.mass, 2),
+         cr.flip = round(cr.flip, 2),
+         cr.tib = round(cr.tib, 2)) %>% 
+  unite(indiv.covs, -contains("chick_id"), sep = " ")
+
+mark_inp_cr <- full_join(ch_creched, indiv_covs)  %>% 
+  distinct() %>%  
+  mutate(chick_id = paste("/*", chick_id, "*/  ")) %>% 
+  unite(ch, sep = " ") %>% 
+  mutate(ch = paste(ch, ";", sep = ""))
+
+
+
+
+write.csv(mark_inp_cr, here("data/mark_in_cr.csv"), row.names = FALSE)
