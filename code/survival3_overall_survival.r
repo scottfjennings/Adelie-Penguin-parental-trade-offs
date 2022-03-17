@@ -495,26 +495,69 @@ step2 <- collect.models(c("phi.year_TT_hatch_p.sat", "phi.year_T_hatch_p.sat", "
                           "phi.year_TT_hatch_age_p.sat", "phi.year_T_hatch_age_p.sat", "phi.year_hatch_age_p.sat"))
 
 
+saveRDS(step2, here("fitted_models/survival/step2"))
+
+
+# check for uninformative parms in step 2 ----
+
 step2 <- readRDS(here("fitted_models/survival/step2"))
 
-step2$model.table <- step2$model.table %>%
-  data.frame() %>%  
-  mutate(model.structure = model,
-         model.structure = gsub(":", ".", model.structure),
-         model.structure = gsub("res.htch", "Hatch date", model.structure),
-         model.structure = gsub("sex", "Sex", model.structure),
-         model.structure = gsub("SEASON", "Yr", model.structure),
-         model.structure = gsub("log\\(Time \\+ 1\\)", "lnT", model.structure),
-         model.structure = gsub("Time \\+ I\\(Time\\^2\\)", "TT", model.structure),
-         model.structure = gsub("Time", "T", model.structure),
-         model.structure = gsub("in.cr", paste("Cr", "\u00E8", "che", sep = ""), model.structure),
-         model.structure = gsub("time\\.", "t \\* ", model.structure),
-         model.structure = gsub("time", "t", model.structure),
-         model.structure = gsub("dayold", "Age", model.structure),
-         model.structure = gsub("\\)p\\(", "\\) p\\(", model.structure))
 
+
+step2_mods <- step2[-length(step2)]
+
+step2_informative <- map2_df(step2_mods, "Phi", cjs_parm_informative)
+
+# we want to indicate uninformative parms in model selection tables. It ended up being simplest to just make the entire output model names here rather than when creating those tables, so we just run all models through ..._parm_informative (not just DAICc < 5)
+
+# p_informative has a row for each parameter in each model, but note it isn't meaningful to check each time varying parm for un vs. informative so these are excluded
+step2_informative <- step2_informative %>% 
+  mutate(parm = gsub(":", ".", parm),
+         parm = sub("resid.", "", parm),
+         parm = sub("sexMale", "sex", parm),
+         parm = sub("SEASON1314", "SEASON", parm),
+         parm = sub("log\\(Time \\+ 1\\)", "lnT", parm),
+         parm = sub("I\\(Time\\^2\\)", "TT", parm),
+         parm = sub("Time", "T", parm)) %>%
+  full_join(., step2$model.table %>% 
+              data.frame() %>% 
+              select(model.name = model, DeltaQAICc)) %>% 
+  mutate(informative85 = ifelse(DeltaQAICc > 5, TRUE, informative85),
+         parm = ifelse(grepl("~1", model.name), "p.intercept", parm),
+         parm = ifelse(grepl("p\\(\\~time:in.cr\\)", model.name), "p.cr", parm))
+
+
+         
+
+step2_informative_wide <- step2_informative %>% 
+           filter(!is.na(parm)) %>% 
+  pivot_wider(id_cols = model.name, names_from = parm, values_from = informative85) %>% 
+  mutate(across(c("Phi.T", "Phi.TT", "Phi.res.htch", "Phi.in.cr", "Phi.dayold"), ~replace_na(., TRUE))) %>% 
+  mutate(phi.stru = gsub("\\)p\\(\\~SEASON \\* sex \\+ time\\)", "", model.name),
+         phi.stru = gsub(":", ".", phi.stru),
+         phi.stru = sub("resid.", "", phi.stru),
+         phi.stru = sub("sexMale", "sex", phi.stru),
+         phi.stru = sub("SEASON1314", "SEASON", phi.stru),
+         phi.stru = sub("Time \\+ I\\(Time\\^2\\)", "TT", phi.stru),
+         phi.stru = sub("Time", "T", phi.stru),
+         phi.stru = sub("in.cr", paste("Cr", "\u00E8", "che", sep = ""), phi.stru),
+         phi.stru = sub("time", "t", phi.stru),
+         phi.stru = sub("res.htch", "Hatch date", phi.stru),
+         phi.stru = sub("Phi\\(\\~", "", phi.stru),
+         phi.stru = ifelse(Phi.SEASON == FALSE, str_replace(phi.stru, "SEASON", paste("SEASON", "\u2020", sep = "")), phi.stru),
+         phi.stru = ifelse(Phi.T == FALSE & !grepl("TT", phi.stru), str_replace(phi.stru, "T", paste("T", "\u2020", sep = "")), phi.stru),
+         phi.stru = ifelse(Phi.TT == FALSE, str_replace(phi.stru, "TT", paste("TT", "\u2020", sep = "")), phi.stru),
+         phi.stru = ifelse(phi.stru == "1", "Intercept only", phi.stru),
+         phi.stru = mod_call_to_structure(phi.stru)) %>% 
+  select(model = model.name, phi.stru)
+
+step2$model.table <- step2$model.table %>% 
+  data.frame() %>% 
+  full_join(step2_informative_wide) %>% 
+  select(-model.structure)
 
 step2$model.table %>% view()
+
 
 saveRDS(step2, here("fitted_models/survival/step2"))
 # model averaging ----
