@@ -75,6 +75,12 @@ penguins.ddl = make.design.data(penguins.process)
 
 # fitting models ----
 
+# strategy is to find the best structure on p and phi variables we want to account for first, then move on to main variables of interest.
+# first find the best p structure while holding phi at most saturated (step 1.1), 
+# then find best basic phi structure while holding p at most saturated (step 1.2)
+# then exclude and uninformative parameters in competitive p and phi structures (step 1.3)
+# and recollect the models with only informative parms (step 1.4)
+# then finally fit models with parameters of interest (step 2)
 # step 1.1 Determine p structure ----
 
 phi.sat = "SEASON * sex + time"
@@ -103,13 +109,19 @@ phi.sat_p.year.sex_lnT <- run.models(phi.stru = phi.sat, p.stru = "SEASON * sex 
 phi.sat_p.year_sex_lnT <- run.models(phi.stru = phi.sat, p.stru = "SEASON + sex + log(Time+1)")
 phi.sat_p.sex_lnT <- run.models(phi.stru = phi.sat, p.stru = "sex + log(Time+1)")
 phi.sat_p.year_lnT <- run.models(phi.stru = phi.sat, p.stru = "SEASON + log(Time+1)")
-# add creched
-phi.sat_p.year.sex_cr <- run.models(phi.stru = phi.sat, p.stru = "SEASON * sex + time:in.cr")
-phi.sat_p.year_sex_cr <- run.models(phi.stru = phi.sat, p.stru = "SEASON + sex + time:in.cr")
-phi.sat_p.sex_cr <- run.models(phi.stru = phi.sat, p.stru = "sex + time:in.cr")
-phi.sat_p.year_cr <- run.models(phi.stru = phi.sat, p.stru = "SEASON + time:in.cr")
+# add creched _ I don't think this is the right way to include individual time-varying covs: http://www.phidot.org/forum/viewtopic.php?f=21&t=3775
+# phi.sat_p.year.sex_cr <- run.models(phi.stru = phi.sat, p.stru = "SEASON * sex + time:in.cr")
+# phi.sat_p.year_sex_cr <- run.models(phi.stru = phi.sat, p.stru = "SEASON + sex + time:in.cr")
+# phi.sat_p.sex_cr <- run.models(phi.stru = phi.sat, p.stru = "sex + time:in.cr")
+# phi.sat_p.year_cr <- run.models(phi.stru = phi.sat, p.stru = "SEASON + time:in.cr")
+# add creched - I think this is the right way to include individual time-varying covs: http://www.phidot.org/forum/viewtopic.php?f=21&t=3775
+# pretty sure we should just end up with 1 beta for the time-varying indiv cov. using incr alone yields 1 beta, time:in.cr yields many betas
+phi.sat_p.year.sex_cr <- run.models(phi.stru = phi.sat, p.stru = "SEASON * sex + in.cr")
+phi.sat_p.year_sex_cr <- run.models(phi.stru = phi.sat, p.stru = "SEASON + sex + in.cr")
+phi.sat_p.sex_cr <- run.models(phi.stru = phi.sat, p.stru = "sex + in.cr")
+phi.sat_p.year_cr <- run.models(phi.stru = phi.sat, p.stru = "SEASON + in.cr")
 
-phi.sat_p.cr <- run.models(phi.stru = phi.sat, p.stru = "time:in.cr")
+phi.sat_p.cr <- run.models(phi.stru = phi.sat, p.stru = "in.cr")
 phi.sat_p.int <- run.models(phi.stru = phi.sat, p.stru = "1")
 
 
@@ -124,18 +136,15 @@ step1.1_p = collect.models(lx = c("phi.sat_p.year.sex", "phi.sat_p.year_sex", "p
                                   "phi.sat_p.year.sex_cr", "phi.sat_p.year_sex_cr", "phi.sat_p.sex_cr", "phi.sat_p.year_cr", 
                                   "phi.sat_p.cr", "phi.sat_p.int"))
 
-# model.table(step1.1_p)
+# model.table(step1.1_p) %>% view()
+
 
 step1.1_p$phi.sat_p.year_cr$results$beta %>% view()
 
 
 saveRDS(step1.1_p, here("fitted_models/survival/step1.1_p"))
 
-readRDS(here("fitted_models/survival/step1.1_p"))$model.table
-# peng.p2 <- readRDS(here("fitted_models/survival/p_models"))
 
-readRDS(here("fitted_models/survival/step1.1_p"))$phi.sat_p.year_sex_cr$results$beta %>% view()
-	
 # step 1.2 Determine phi structure ----
 ###	now moving on to modeling Phi, with the best p structure from above, which is SEASON+time
 
@@ -219,81 +228,132 @@ saveRDS(step1.2_phi, here("fitted_models/survival/step1.2_phi"))
 
 
 #
-# Step 1.3: create new candidate set from the best structures from above ----
-# step 1.3.1: first check for uninformative parms where DQAICC < 5 in step 5.1  ----
-
+# step 1.3: first check for uninformative parms where DQAICC < 5 in step 5.1  ----
+# p ----
 step1.1_p <- readRDS(here("fitted_models/survival/step1.1_p"))
 
-step1.1_p %>% 
-  model.table(model.name = FALSE) %>% 
-  filter(DeltaQAICc <= 5) %>% 
-  mutate(uninform.assign = paste("cjs_parm_informative(step1.1_p$", model, ", \"p\")", sep = "")) %>% 
-  summarise(uninform.assign = paste(uninform.assign, collapse = ", ")) %>% 
-  mutate(uninform.assign = paste("p_informative <- rbind(", uninform.assign, ")", sep = ""))
+p_mods <- step1.1_p[-length(step1.1_p)]
 
-# for some reason map2_df not working for this so need to manually rbind
-p_informative <- rbind(cjs_parm_informative(step1.1_p$phi.sat_p.year_sex_t, "p"), 
-                             cjs_parm_informative(step1.1_p$phi.sat_p.year_t, "p"), 
-                             cjs_parm_informative(step1.1_p$phi.sat_p.year.sex_t, "p"))
+p_informative <- map2_df(p_mods, "p", cjs_parm_informative)
 
+# we want to indicate uninformative parms in model selection tables. It ended up being simplest to just make the entire output model names here rather than when creating those tables, so we just run all models through ..._parm_informative (not just DAICc < 5)
+
+# p_informative has a row for each parameter in each model, but note it isn't meaningful to check each time varying parm for un vs. informative so these are excluded
 p_informative <- p_informative %>% 
-  mutate(mod.name = gsub("step1.1_p\\$", "", mod.name))
+  mutate(parm = gsub(":", ".", parm),
+         parm = sub("resid.", "", parm),
+         parm = sub("sexMale", "sex", parm),
+         parm = sub("SEASON1314", "SEASON", parm),
+         parm = sub("log\\(Time \\+ 1\\)", "lnT", parm),
+         parm = sub("I\\(Time\\^2\\)", "TT", parm),
+         parm = sub("Time", "T", parm)) %>%
+  full_join(., step1.1_p$model.table %>% 
+              data.frame() %>% 
+              select(model.name = model, DeltaQAICc)) %>% 
+  mutate(informative85 = ifelse(DeltaQAICc > 5, TRUE, informative85),
+         parm = ifelse(grepl("~1", model.name), "p.intercept", parm),
+         parm = ifelse(grepl("p\\(\\~time:in.cr\\)", model.name), "p.cr", parm))
+
+
+         
 
 p_informative_wide <- p_informative %>% 
-  pivot_wider(id_cols = mod.name, names_from = parm, values_from = informative85) %>% 
-  mutate(uninformative = "")
+           filter(!is.na(parm)) %>% 
+  pivot_wider(id_cols = model.name, names_from = parm, values_from = informative85) %>% 
+  mutate(across(c("p.SEASON", "p.sex", "p.SEASON.sex", "p.T", "p.TT", "p.lnT", "p.intercept"), ~replace_na(., TRUE))) %>% 
+  mutate(p.stru = gsub("Phi\\(\\~SEASON \\* sex \\+ time\\)p\\(\\~", "", model.name),
+         p.stru = gsub(":", ".", p.stru),
+         p.stru = sub("resid.", "", p.stru),
+         p.stru = sub("sexMale", "sex", p.stru),
+         p.stru = sub("SEASON1314", "SEASON", p.stru),
+         p.stru = sub("log\\(Time \\+ 1\\)", "lnT", p.stru),
+         p.stru = sub("Time \\+ I\\(Time\\^2\\)", "TT", p.stru),
+         p.stru = sub("Time", "T", p.stru),
+         p.stru = sub("in.cr", paste("Cr", "\u00E8", "che", sep = ""), p.stru),
+         p.stru = sub("time", "t", p.stru),
+         p.stru = sub("\\)", "", p.stru),
+         p.stru = ifelse(p.SEASON.sex == FALSE, str_replace(p.stru, "SEASON \\* sex", paste("(SEASON \\* sex)", "\u2020", sep = "")), p.stru),
+         p.stru = ifelse(p.SEASON == FALSE, str_replace(p.stru, "SEASON", paste("SEASON", "\u2020", sep = "")), p.stru),
+         p.stru = ifelse(p.sex == FALSE, str_replace(p.sex, "sex", paste("sex", "\u2020", sep = "")), p.stru),
+         p.stru = ifelse(p.T == FALSE, str_replace(p.T, "T", paste("T", "\u2020", sep = "")), p.stru),
+         p.stru = ifelse(p.TT == FALSE, str_replace(p.TT, "TT", paste("TT", "\u2020", sep = "")), p.stru),
+         p.stru = ifelse(p.lnT == FALSE, str_replace(p.lnT, "lnT", paste("lnT", "\u2020", sep = "")), p.stru),
+         p.stru = ifelse(p.stru == "1", "Intercept only", p.stru),
+         p.stru = mod_call_to_structure(p.stru)) %>% 
+  select(model = model.name, p.stru)
+
+step1.1_p$model.table <- step1.1_p$model.table %>% 
+  data.frame() %>% 
+  full_join(p_informative_wide)
+
+step1.1_p$model.table %>% view()
+
+saveRDS(step1.1_p, here("fitted_models/survival/step1.1_p"))
 
 
-p_informative_wide <- edit(p_informative_wide)
-
-p_informative_wide %>%
-  filter(uninformative == TRUE) %>%  
-  select(mod.name, uninformative) %>% 
-  saveRDS(here("fitted_models/survival/step1.1_uninformative"))
-
+# step1.1_p$model.table %>% view()
 
 # sex:SEASON parm is uninformative at P = 0.157 (85% CI) in phi.sat_p.year.sex_t (DAICc = 2.19)
 # so just carrying phi.sat_p.year_sex_t and phi.sat_p.year_t forward
 
-
+# phi ----
 step1.2_phi <- readRDS(here("fitted_models/survival/step1.2_phi"))
 
-step1.2_phi %>% 
-  model.table(model.name = FALSE) %>% 
-  filter(DeltaQAICc <= 5) %>% 
-  mutate(uninform.assign = paste("cjs_parm_informative(step1.2_phi$", model, ", \"Phi\")", sep = "")) %>% 
-  summarise(uninform.assign = paste(uninform.assign, collapse = ", ")) %>% 
-  mutate(uninform.assign = paste("phi_informative <- rbind(", uninform.assign, ")", sep = ""))
+phi_mods <- step1.2_phi[-length(step1.2_phi)]
 
-
-
-phi_informative <- rbind(cjs_parm_informative(step1.2_phi$phi.year_TT_hatch_p.sat, "Phi"), 
-                             cjs_parm_informative(step1.2_phi$phi.year_T_hatch_p.sat, "Phi"), 
-                             cjs_parm_informative(step1.2_phi$phi.year_hatch_p.sat, "Phi"), 
-                             cjs_parm_informative(step1.2_phi$phi.year.sex_TT_hatch_p.sat, "Phi"), 
-                             cjs_parm_informative(step1.2_phi$phi.year_lnT_hatch_p.sat, "Phi"), 
-                             cjs_parm_informative(step1.2_phi$phi.year.sex_T_hatch_p.sat, "Phi"), 
-                             cjs_parm_informative(step1.2_phi$phi.year_sex_TT_hatch_p.sat, "Phi"), 
-                             cjs_parm_informative(step1.2_phi$phi.year.sex_hatch_p.sat, "Phi"), 
-                             cjs_parm_informative(step1.2_phi$phi.year_sex_T_hatch_p.sat, "Phi"), 
-                             cjs_parm_informative(step1.2_phi$phi.year.sex_lnT_hatch_p.sat, "Phi"), 
-                             cjs_parm_informative(step1.2_phi$phi.year_sex_hatch_p.sat, "Phi"), 
-                             cjs_parm_informative(step1.2_phi$phi.year_sex_lnT_hatch_p.sat, "Phi"))
+phi_informative <- map2_df(phi_mods, "Phi", cjs_parm_informative)
 
 
 phi_informative <- phi_informative %>% 
-  mutate(mod.name = gsub("step1.2_phi\\$", "", mod.name))
+  mutate(parm = gsub(":", ".", parm),
+         parm = sub("resid.", "", parm),
+         parm = sub("sexMale", "sex", parm),
+         parm = sub("SEASON1314", "SEASON", parm),
+         parm = sub("log\\(Time \\+ 1\\)", "lnT", parm),
+         parm = sub("I\\(Time\\^2\\)", "TT", parm),
+         parm = sub("Time", "T", parm)) %>%
+  full_join(., step1.2_phi$model.table %>% 
+              data.frame() %>% 
+              select(model.name = model, DeltaQAICc))%>% 
+  mutate(informative85 = ifelse(DeltaQAICc > 5, TRUE, informative85),
+         parm = ifelse(grepl("~1", model.name), "Phi.intercept", parm))
+
+
+         
 
 phi_informative_wide <- phi_informative %>% 
-  pivot_wider(id_cols = mod.name, names_from = parm, values_from = informative85) %>% 
-  mutate(uninformative = "")
+           filter(!is.na(parm)) %>% 
+  pivot_wider(id_cols = model.name, names_from = parm, values_from = informative85) %>% 
+  mutate(across(c("Phi.SEASON", "Phi.sex", "Phi.SEASON.sex", "Phi.T", "Phi.TT", "Phi.lnT", "Phi.intercept"), ~replace_na(., TRUE))) %>% 
+  mutate(phi.stru = gsub("\\)p\\(\\~SEASON \\* sex \\+ time\\)", "", model.name),
+         phi.stru = gsub(":", ".", phi.stru),
+         phi.stru = sub("resid.", "", phi.stru),
+         phi.stru = sub("sexMale", "sex", phi.stru),
+         phi.stru = sub("SEASON1314", "SEASON", phi.stru),
+         phi.stru = sub("log\\(Time \\+ 1\\)", "lnT", phi.stru),
+         phi.stru = sub("Time \\+ I\\(Time\\^2\\)", "TT", phi.stru),
+         phi.stru = sub("Time", "T", phi.stru),
+         phi.stru = sub("time.in.cr", "Crèche", phi.stru),
+         phi.stru = sub("time", "t", phi.stru),
+         phi.stru = sub("res.htch", "Hatch date", phi.stru),
+         phi.stru = sub("Phi\\(\\~", "", phi.stru),
+         phi.stru = ifelse(Phi.SEASON.sex == FALSE, str_replace(phi.stru, "SEASON \\* sex", paste("(SEASON \\* sex)", "\u2020", sep = "")), phi.stru),
+         phi.stru = ifelse(Phi.SEASON == FALSE, str_replace(phi.stru, "SEASON", paste("SEASON", "\u2020", sep = "")), phi.stru),
+         phi.stru = ifelse(Phi.sex == FALSE, str_replace(phi.stru, "sex", paste("sex", "\u2020", sep = "")), phi.stru),
+         phi.stru = ifelse(Phi.T == FALSE & !grepl("TT", phi.stru), str_replace(phi.stru, "T", paste("T", "\u2020", sep = "")), phi.stru),
+         phi.stru = ifelse(Phi.TT == FALSE, str_replace(phi.stru, "TT", paste("TT", "\u2020", sep = "")), phi.stru),
+         phi.stru = ifelse(Phi.lnT == FALSE, str_replace(phi.stru, "lnT", paste("lnT", "\u2020", sep = "")), phi.stru),
+         phi.stru = ifelse(phi.stru == "1", "Intercept only", phi.stru),
+         phi.stru = mod_call_to_structure(phi.stru)) %>% 
+  select(model = model.name, phi.stru)
 
-phi_informative_wide <- edit(phi_informative_wide)
+step1.2_phi$model.table <- step1.2_phi$model.table %>% 
+  data.frame() %>% 
+  full_join(phi_informative_wide)
 
-phi_informative_wide %>%
-  filter(uninformative == TRUE) %>%  
-  select(mod.name, uninformative) %>% 
-  saveRDS(here("fitted_models/survival/step1.2_uninformative"))
+step1.2_phi$model.table %>% view()
+
+saveRDS(step1.2_phi, here("fitted_models/survival/step1.2_phi"))
 
 
 # in TT models, T2 parm is informative but T not; keeping TT models
@@ -305,45 +365,59 @@ phi_informative_wide %>%
 # "phi.year_hatch_p.sat"
 
 
+# Step 1.4: create new candidate set from the best structures from above ----
 
-step5.2_uninformative <- phi_informative_wide %>%
-  select(mod.name, uninformative) %>% 
-  filter(uninformative == TRUE) %>% 
-  left_join(., phi_best) %>% 
-  select(model, mod.name, uninformative)
+step1.1_p <- readRDS(here("fitted_models/survival/step1.1_p"))
+step1.2_phi <- readRDS(here("fitted_models/survival/step1.2_phi"))
 
-saveRDS(step5.2_uninformative, here("fitted_models/survival/step5.2_uninformative"))
+phi.sat_p.year_sex_t <- step1.1_p$phi.sat_p.year_sex_t
+phi.sat_p.year_t <- step1.1_p$phi.sat_p.year_t
+phi.year_TT_hatch_p.sat <- step1.2_phi$phi.year_TT_hatch_p.sat
+phi.year_T_hatch_p.sat <- step1.2_phi$phi.year_T_hatch_p.sat
+phi.year_hatch_p.sat <- step1.2_phi$phi.year_hatch_p.sat
 
-
-
-step1.3 = collect.models(lx=c("phi.sat_p.year_sex_t", "phi.sat_p.year_t", 
-                              # "phi.sat_p.year.sex_t", uninformative
-                              "phi.year_TT_hatch_p.sat", "phi.year_T_hatch_p.sat", "phi.year_hatch_p.sat"
-                              # "phi.year.sex_TT_hatch_p.sat", "phi.year_lnT_hatch_p.sat", "phi.year.sex_T_hatch_p.sat", "phi.year_sex_TT_hatch_p.sat", "phi.year.sex_hatch_p.sat", "phi.year_sex_T_hatch_p.sat", "phi.year.sex_lnT_hatch_p.sat", "phi.year_sex_hatch_p.sat", "phi.year_sex_lnT_hatch_p.sat" these uninformative
-                              ))
+step1.4 = collect.models(lx=c("phi.sat_p.year_sex_t", "phi.sat_p.year_t", 
+                              "phi.year_TT_hatch_p.sat", "phi.year_T_hatch_p.sat", "phi.year_hatch_p.sat"))
 
 
-model.table(step1.3) %>% 
-  select(-model)
-saveRDS(step1.3, here("fitted_models/survival/step1.3"))
+step1.4$model.table <- step1.4$model.table %>% 
+  mutate(model.structure = model,
+         model.structure = gsub(":", ".", model.structure),
+         model.structure = gsub("res.htch", "Hatch date", model.structure),
+         model.structure = gsub("sex", "Sex", model.structure),
+         model.structure = gsub("SEASON", "Yr", model.structure),
+         model.structure = gsub("log\\(Time \\+ 1\\)", "lnT", model.structure),
+         model.structure = gsub("Time \\+ I\\(Time\\^2\\)", "TT", model.structure),
+         model.structure = gsub("Time", "T", model.structure),
+         model.structure = gsub("in.cr", paste("Cr", "\u00E8", "che", sep = ""), model.structure),
+         model.structure = gsub("time", "t", model.structure),
+         model.structure = gsub("\\)p\\(", "\\) p\\(", model.structure))
 
 
+step1.4$model.table %>% view()
+saveRDS(step1.4, here("fitted_models/survival/step1.4"))
+
+#
 # step 2. main variables of interest for overall survival: Age and creched status ----
 
 
-step1.3mods <- readRDS(here("fitted_models/survival/step1.3"))
+step1.4mods <- readRDS(here("fitted_models/survival/step1.4"))
 
-step2_cand_set_base <- step1.3mods %>% 
+#
+# more code to generate code NO RUN ----
+# get DQAICc <= 5 models from previous step
+step2_cand_set_base <- step1.4mods %>% 
   model.table() %>% 
   data.frame() %>%
   rownames_to_column("mod.num") %>% 
   filter(DeltaQAICc <= 5) %>% 
-  left_join(., names(step1.3mods) %>%
+  left_join(., names(step1.4mods) %>%
               data.frame() %>%
               rownames_to_column("mod.num") %>%
               rename(mod.name = 2)) %>% 
-  select(mod.name, Phi, DeltaQAICc) %>% 
-  mutate(Phi = gsub("~", "", Phi))
+  select(mod.name, Phi, p, DeltaQAICc) %>% 
+  mutate(Phi = gsub("~", "", Phi),
+         p = gsub("~", "", p))
 
 # best from step 1.3
 step2_cand_set_base %>% 
@@ -394,51 +468,53 @@ step2_cand_set_base %>%
   summarise(collect.call = paste(mod.name, collapse = "\", \""))
 
 
-# assign/run all the models
+# now assign/run all the models ----
 # best from 1.3, don't need to refit these
-phi.year_TT_hatch_p.sat <- step1.3mods$phi.year_TT_hatch_p.sat
-phi.year_T_hatch_p.sat <- step1.3mods$phi.year_T_hatch_p.sat
-phi.year_hatch_p.sat <- step1.3mods$phi.year_hatch_p.sat
-# plus additive time and creched
-phi.year_TT_hatch_t_incr_p.sat <- run.models(phi.stru = "SEASON + Time + I(Time^2) + res.htch + time + in.cr")
-phi.year_T_hatch_t_incr_p.sat <- run.models(phi.stru = "SEASON + Time + res.htch + time + in.cr")
-phi.year_hatch_t_incr_p.sat <- run.models(phi.stru = "SEASON + res.htch + time + in.cr")
-# plus additive time and age
-phi.year_TT_hatch_t_age_p.sat <- run.models(phi.stru = "SEASON + Time + I(Time^2) + res.htch + time + dayold")
-phi.year_T_hatch_t_age_p.sat <- run.models(phi.stru = "SEASON + Time + res.htch + time + dayold")
-phi.year_hatch_t_age_p.sat <- run.models(phi.stru = "SEASON + res.htch + time + dayold")
-# plus interaction time and creched
-phi.year_TT_hatch_t.incr_p.sat <- run.models(phi.stru = "SEASON + Time + I(Time^2) + res.htch + time:in.cr")
-phi.year_T_hatch_t.incr_p.sat <- run.models(phi.stru = "SEASON + Time + res.htch + time:in.cr")
-phi.year_hatch_t.incr_p.sat <- run.models(phi.stru = "SEASON + res.htch + time:in.cr")
-# plus interaction time and age
-phi.year_TT_hatch_t.age_p.sat <- run.models(phi.stru = "SEASON + Time + I(Time^2) + res.htch + time:dayold")
-phi.year_T_hatch_t.age_p.sat <- run.models(phi.stru = "SEASON + Time + res.htch + time:dayold")
-phi.year_hatch_t.age_p.sat <- run.models(phi.stru = "SEASON + res.htch + time:dayold")
+phi.year_TT_hatch_p.sat <- step1.4mods$phi.year_TT_hatch_p.sat
+phi.year_T_hatch_p.sat <- step1.4mods$phi.year_T_hatch_p.sat
+phi.year_hatch_p.sat <- step1.4mods$phi.year_hatch_p.sat
+# plus time-varying individual covariate for creched status - this is the proper way to code the time-varying indiv covs
+phi.year_TT_hatch_incr_p.sat <- run.models(phi.stru = "SEASON + Time + I(Time^2) + res.htch + in.cr")
+phi.year_T_hatch_incr_p.sat <- run.models(phi.stru = "SEASON + Time + res.htch + in.cr")
+phi.year_hatch_incr_p.sat <- run.models(phi.stru = "SEASON + res.htch + in.cr")
+# plus time varying age - this is the proper way to code the time-varying indiv covs
+phi.year_TT_hatch_age_p.sat <- run.models(phi.stru = "SEASON + Time + I(Time^2) + res.htch + dayold")
+phi.year_T_hatch_age_p.sat <- run.models(phi.stru = "SEASON + Time + res.htch + dayold")
+phi.year_hatch_age_p.sat <- run.models(phi.stru = "SEASON + res.htch + dayold")
 
 
 # export some DMs to double check
-phi.year_TT_hatch_t_incr_p.sat$design.matrix %>% write.csv(here("fitted_models/phi.year_TT_hatch_t_incr_p.sat.csv"))
-phi.year_TT_hatch_t.incr_p.sat$design.matrix %>% write.csv(here("fitted_models/phi.year_TT_hatch_t.incr_p.sat.csv"))
+phi.year_T_hatch_incr_p.sat$design.matrix %>% write.csv(here("fitted_models/phi.year_TT_hatch_t_incr_p.sat.csv"))
+phi.year_T_hatch.age_p.sat$design.matrix %>% write.csv(here("fitted_models/phi.year_TT_hatch_t.incr_p.sat.csv"))
 
 
 step2 <- collect.models(c("phi.year_TT_hatch_p.sat", "phi.year_T_hatch_p.sat", "phi.year_hatch_p.sat", 
-                          #t_incr
-                          "phi.year_TT_hatch_t_incr_p.sat", "phi.year_T_hatch_t_incr_p.sat", "phi.year_hatch_t_incr_p.sat", 
-                          #t_age
-                          "phi.year_TT_hatch_t_age_p.sat", "phi.year_T_hatch_t_age_p.sat", "phi.year_hatch_t_age_p.sat", 
-                          #t:incr
-                          "phi.year_TT_hatch_t.incr_p.sat", "phi.year_T_hatch_t.incr_p.sat", "phi.year_hatch_t.incr_p.sat", 
-                          #t:age
-                          "phi.year_TT_hatch_t.age_p.sat", "phi.year_T_hatch_t.age_p.sat", "phi.year_hatch_t.age_p.sat"))
+                          #incr
+                          "phi.year_TT_hatch_incr_p.sat", "phi.year_T_hatch_incr_p.sat", "phi.year_hatch_incr_p.sat", 
+                          #age
+                          "phi.year_TT_hatch_age_p.sat", "phi.year_T_hatch_age_p.sat", "phi.year_hatch_age_p.sat"))
 
-step2$model.table %>%
+
+step2 <- readRDS(here("fitted_models/survival/step2"))
+
+step2$model.table <- step2$model.table %>%
   data.frame() %>%  
-  rownames_to_column("mod.num") %>% 
-  left_join(names(step2) %>%
-              data.frame() %>%
-              rename(mod.name = 1) %>%
-              rownames_to_column("mod.num")) %>% view()
+  mutate(model.structure = model,
+         model.structure = gsub(":", ".", model.structure),
+         model.structure = gsub("res.htch", "Hatch date", model.structure),
+         model.structure = gsub("sex", "Sex", model.structure),
+         model.structure = gsub("SEASON", "Yr", model.structure),
+         model.structure = gsub("log\\(Time \\+ 1\\)", "lnT", model.structure),
+         model.structure = gsub("Time \\+ I\\(Time\\^2\\)", "TT", model.structure),
+         model.structure = gsub("Time", "T", model.structure),
+         model.structure = gsub("in.cr", paste("Cr", "\u00E8", "che", sep = ""), model.structure),
+         model.structure = gsub("time\\.", "t \\* ", model.structure),
+         model.structure = gsub("time", "t", model.structure),
+         model.structure = gsub("dayold", "Age", model.structure),
+         model.structure = gsub("\\)p\\(", "\\) p\\(", model.structure))
+
+
+step2$model.table %>% view()
 
 saveRDS(step2, here("fitted_models/survival/step2"))
 # model averaging ----
