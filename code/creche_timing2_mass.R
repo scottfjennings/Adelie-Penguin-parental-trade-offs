@@ -46,44 +46,52 @@ saveRDS(cr_mass_step1_mods, here("fitted_models/cr_timing/cr_mass_step1_mods"))
 
 
 # mass.sex_year best supported
-# creching mass model selection step 2 ----
-# uninformative parms in supported step 1 models?
+# uninformative parms in supported step 1 models? ----
+
+# we want to indicate uninformative parms in model selection tables. It ended up being simplest to just make the entire output model names here rather than when creating those tables, so we just run all models through ..._parm_informative (not just DAICc < 5)
+
 cr_mass_step1_mods <- readRDS(here("fitted_models/cr_timing/cr_mass_step1_mods"))
 
-cr_mass_step1_mods$model.table %>%
-  data.frame() %>%
-  rownames_to_column("mod.num") %>% 
-  filter(Delta_AICc <= 5) %>% 
-  mutate(uninform.assign = paste("lm_parm_informative(cr_mass_step1_mods$", Modnames, ")", sep = "")) %>% 
-  summarise(uninform.assign = paste(uninform.assign, collapse = ", ")) %>% 
-  mutate(uninform.assign = paste("cr_mass_informative <- rbind(", uninform.assign, ")", sep = ""))
+cr_mass_mods <- cr_mass_step1_mods[-length(cr_mass_step1_mods)]
 
+cr_mass_informative <- map2_df(cr_mass_mods, names(cr_mass_mods), lm_parm_informative)
 
-cr_mass_informative <- rbind(lm_parm_informative(cr_mass_step1_mods$sex_year_hatch), 
-                             lm_parm_informative(cr_mass_step1_mods$year_hatch), 
-                             lm_parm_informative(cr_mass_step1_mods$sex.year_hatch))
 
 cr_mass_informative <- cr_mass_informative %>% 
-  mutate(mod.name = gsub("cr_mass_step1_mods\\$", "", mod.name))
+  mutate(mod.name = gsub("cr_mass_step1_mods\\$", "", mod.name),
+         parm = gsub(":", ".", parm),
+         parm = sub("resid.", "", parm),
+         parm = sub("sexM", "sex", parm),
+         parm = sub("SEASON1314", "SEASON", parm),
+         mod.call = sub("resid.", "", mod.call)) %>% 
+  full_join(., cr_mass_step1_mods$model.table %>%
+              data.frame() %>% 
+              select(mod.name = Modnames, Delta_AICc)) %>% 
+  mutate(informative85 = ifelse(Delta_AICc > 5, TRUE, informative85))
 
-cr_mass_informative_wide <- cr_mass_informative %>% 
-  pivot_wider(id_cols = mod.name, names_from = parm, values_from = informative85) %>% 
-  mutate(uninformative = "")
+cr_mass_informative_wide <- cr_mass_informative %>%
+  mutate(parm = ifelse(mod.name == "int", "intercept", parm)) %>% 
+  pivot_wider(id_cols = c(mod.name, mod.call), names_from = parm, values_from = informative85) %>% 
+  mutate(across(c("SEASON", "hatch", "sex", "sex.SEASON"), ~replace_na(., TRUE))) %>% 
+  mutate(mod.call = ifelse(sex.SEASON == FALSE, str_replace(mod.call, "sex \\* SEASON", paste("(sex \\* SEASON)", "\u2020", sep = "")), mod.call),
+         mod.call = ifelse(sex == FALSE, str_replace(mod.call, "sex", paste("sex", "\u2020", sep = "")), mod.call),
+         mod.call = ifelse(hatch == FALSE, str_replace(mod.call, "hatch", paste("hatch", "\u2020", sep = "")), mod.call),
+         mod.call = ifelse(SEASON == FALSE, str_replace(mod.call, "SEASON", paste("SEASON", "\u2020", sep = "")), mod.call),
+         mod.call = ifelse(mod.name == "int", "Intercept only", mod.call),
+         mod.call = mod_call_to_structure(mod.call)) %>% 
+  select(Modnames = mod.name, model.structure = mod.call)
 
 
-cr_mass_informative_wide <- edit(cr_mass_informative_wide)
-
-cr_mass_informative_wide %>% 
-  filter(uninformative == TRUE) %>%  
-  select(mod.name, uninformative) %>% 
-  saveRDS(here("fitted_models/cr_timing/cr_mass_step1_uninformative"))
+cr_mass_step1_mods$model.table <- cr_mass_step1_mods$model.table %>% 
+  data.frame() %>% 
+  full_join(., cr_mass_informative_wide) 
 
 
-cr_mass_informative_wide %>% 
-  filter(uninformative != TRUE) %>%
-  mutate(mod.assign = paste(mod.name, " = cr_mass_step1_mods$", mod.name, sep = "")) %>% 
-  select(mod.assign)
-         
+saveRDS(cr_mass_step1_mods, here("fitted_models/cr_timing/cr_mass_step1_mods"))
+
+# creching mass model selection step 2 ----
+cr_mass_step1_mods <- readRDS(here("fitted_models/cr_timing/cr_mass_step1_mods"))
+
 
 cr_mass_step2_mods <- list(
   sex_year_hatch = cr_mass_step1_mods$sex_year_hatch,
@@ -100,6 +108,50 @@ cr_mass_step2_mods <- list(
 
 
 cr_mass_step2_mods$model.table = aictab(cr_mass_step2_mods, names(cr_mass_step2_mods))
+
+saveRDS(cr_mass_step2_mods, here("fitted_models/cr_timing/cr_mass_step2_mods"))
+
+# uninformative parms in step 2? ----
+cr_mass_step2_mods <- readRDS(here("fitted_models/cr_timing/cr_mass_step2_mods"))
+
+
+cr_mass2_mods <- cr_mass_step2_mods[-length(cr_mass_step2_mods)]
+
+cr_mass2_informative <- map2_df(cr_mass2_mods, names(cr_mass2_mods), lm_parm_informative)
+
+
+cr_mass2_informative <- cr_mass2_informative %>% 
+  mutate(mod.name = gsub("cr_mass_step2_mods\\$", "", mod.name),
+         parm = gsub(":", ".", parm),
+         parm = sub("resid.", "", parm),
+         parm = sub("sexM", "sex", parm),
+         parm = sub("SEASON1314", "SEASON", parm),
+         mod.call = sub("resid.", "", mod.call)) %>% 
+  full_join(., cr_mass_step2_mods$model.table %>%
+              data.frame() %>% 
+              select(mod.name = Modnames, Delta_AICc)) %>% 
+  mutate(informative85 = ifelse(Delta_AICc > 5, TRUE, informative85))
+
+cr_mass2_informative_wide <- cr_mass2_informative %>%
+  mutate(parm = ifelse(mod.name == "int", "intercept", parm)) %>% 
+  pivot_wider(id_cols = c(mod.name, mod.call), names_from = parm, values_from = informative85) %>% 
+  mutate(across(c("SEASON", "hatch", "sex", "weight.slope40", "cr.age", "sex"), ~replace_na(., TRUE))) %>% 
+  mutate(mod.call = ifelse(sex == FALSE, str_replace(mod.call, "sex", paste("sex", "\u2020", sep = "")), mod.call),
+         mod.call = ifelse(hatch == FALSE, str_replace(mod.call, "hatch", paste("hatch", "\u2020", sep = "")), mod.call),
+         mod.call = ifelse(SEASON == FALSE, str_replace(mod.call, "SEASON", paste("SEASON", "\u2020", sep = "")), mod.call),
+         mod.call = ifelse(weight.slope40 == FALSE, str_replace(mod.call, "weight.slope40", paste("weight.slope40", "\u2020", sep = "")), mod.call),
+         mod.call = ifelse(cr.age == FALSE, str_replace(mod.call, "cr.age", paste("cr.age", "\u2020", sep = "")), mod.call),
+         mod.call = ifelse(mod.name == "int", "Intercept only", mod.call),
+         mod.call = mod_call_to_structure(mod.call)) %>% 
+  select(Modnames = mod.name, model.structure = mod.call)
+
+
+cr_mass_step2_mods$model.table <- cr_mass_step2_mods$model.table %>% 
+  data.frame() %>% 
+  full_join(., cr_mass2_informative_wide) 
+
+# cr_mass_step2_mods$model.table %>% view()
+
 
 
 saveRDS(cr_mass_step2_mods, here("fitted_models/cr_timing/cr_mass_step2_mods"))
