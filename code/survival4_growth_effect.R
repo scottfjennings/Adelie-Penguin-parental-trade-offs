@@ -13,8 +13,12 @@ library(R2ucare)
 library(here)
 options(scipen = 999)
 
+source(here("code/utilities.R"))
 # setting working directory only to control location for all the Mark output files
 setwd(here("mark_output"))
+
+
+# this part of the analysis needs to be separate from step 3 because it uses the subset of chicks for which I could extimate growth rates
 
 
 
@@ -38,7 +42,7 @@ setwd(here("mark_output"))
 
 ## !!!NOTE 8/26/21- inp file now almost entirely created by code, including in.cr fields. See survival1_make_inp.R for code and notes 
 
-
+# data ----
 penguins=convert.inp(here("data/mark_in.inp"), 
 					group.df=data.frame(sex=rep(c("Male","Female"),2), SEASON=c(rep("1213",2),rep("1314",2))), 
 					covariates=c("dayold50", "dayold51", "dayold52", "dayold53", "dayold54", "dayold55", "dayold56", 
@@ -81,15 +85,15 @@ return(zmod)
 
 # evaluating effect of growth rates on survival
 
-# helper code to generate actual model fitting code ----
-step1.3mods <- readRDS(here("fitted_models/survival/step1.3"))
-
-step4_cand_set_base <- step1.3mods %>% 
+# helper code to generate actual model fitting code - NO RUN ----
+step1.4mods <- readRDS(here("fitted_models/survival/step1.4"))
+step1.4mods$model.table %>% view()
+step4_cand_set_base <- step1.4mods %>% 
   model.table() %>% 
   data.frame() %>%
   rownames_to_column("mod.num") %>% 
   filter(DeltaQAICc <= 5) %>% 
-  left_join(., names(step1.3mods) %>%
+  left_join(., names(step1.4mods) %>%
               data.frame() %>%
               rownames_to_column("mod.num") %>%
               rename(mod.name = 2)) %>% 
@@ -100,7 +104,7 @@ step4_cand_set_base <- step1.3mods %>%
 step4_cand_set_base %>% 
   mutate(mod.assign = paste(mod.name, " <- run.models(phi.stru = \"", Phi, "\")", sep = "")) %>%  
   select(mod.assign)
-# now adding in time varying variables. these always need to have time, either time+ or time:
+# now adding in growth variables.
 # best from step 1.3 plus additive mass growth rate
 step4_cand_set_base %>% 
   mutate(mod.assign = paste(gsub("_p.", "_massgr_p.", mod.name), " <- run.models(phi.stru = \"", Phi, " + mass.gr\")", sep = "")) %>% 
@@ -135,7 +139,7 @@ step4_cand_set_base %>%
   select(mod.name)) %>% 
   summarise(collect.call = paste(mod.name, collapse = "\", \""))
 
-# fitting models ----
+# now fitting models ----
 # best step1.3
 phi.year_TT_hatch_p.sat <- run.models(phi.stru = "SEASON + Time + I(Time^2) + res.htch")
 phi.year_T_hatch_p.sat <- run.models(phi.stru = "SEASON + Time + res.htch")
@@ -163,11 +167,71 @@ step4_growth_surv <- collect.models(lx = c("phi.year_TT_hatch_p.sat", "phi.year_
                                            "phi.year_TT_hatch_tibgr_p.sat", "phi.year_T_hatch_tibgr_p.sat", "phi.year_hatch_tibgr_p.sat"))
 
 
-model.table(step4_growth_surv) %>% 
-  select(-model)
-
-
 saveRDS(step4_growth_surv, here("fitted_models/survival/step4_growth_surv"))
 
+# check for uninformative parms in step 4 ----
 
-# growth_surv_models <- readRDS(here("fitted_models/survival/growth_surv_models"))
+step4 <- readRDS(here("fitted_models/survival/step4_growth_surv"))
+
+step4_mods <- step4[-length(step4)]
+
+step4_informative <- map2_df(step4_mods, "Phi", cjs_parm_informative)
+
+# we want to indicate uninformative parms in model selection tables. It ended up being simplest to just make the entire output model names here rather than when creating those tables, so we just run all models through ..._parm_informative (not just DAICc < 5)
+
+# p_informative has a row for each parameter in each model, but note it isn't meaningful to check each time varying parm for un vs. informative so these are excluded
+step4_informative <- step4_informative %>% 
+  mutate(parm = gsub(":", ".", parm),
+         parm = sub("resid.", "", parm),
+         parm = sub("sexMale", "sex", parm),
+         parm = sub("SEASON1314", "SEASON", parm),
+         parm = sub("log\\(Time \\+ 1\\)", "lnT", parm),
+         parm = sub("I\\(Time\\^2\\)", "TT", parm),
+         parm = sub("Time", "T", parm)) %>%
+  full_join(., step4$model.table %>% 
+              data.frame() %>% 
+              select(model.name = model, DeltaQAICc)) %>% 
+  mutate(informative85 = ifelse(DeltaQAICc > 5, TRUE, informative85),
+         parm = ifelse(grepl("~1", model.name), "p.intercept", parm),
+         parm = ifelse(grepl("p\\(\\~time:in.cr\\)", model.name), "p.cr", parm))
+
+
+         
+
+step4_informative_wide <- step4_informative %>% 
+           filter(!is.na(parm)) %>% 
+  pivot_wider(id_cols = model.name, names_from = parm, values_from = informative85) %>% 
+  mutate(across(c("Phi.T", "Phi.TT", "Phi.res.htch", "Phi.mass.gr",  "Phi.flip.gr",  "Phi.tib.gr"), ~replace_na(., TRUE))) %>% 
+  mutate(phi.stru = gsub("\\)p\\(\\~SEASON \\* sex \\+ time\\)", "", model.name),
+         phi.stru = gsub(":", ".", phi.stru),
+         phi.stru = sub("resid.", "", phi.stru),
+         phi.stru = sub("sexMale", "sex", phi.stru),
+         phi.stru = sub("SEASON1314", "SEASON", phi.stru),
+         phi.stru = sub("Time \\+ I\\(Time\\^2\\)", "TT", phi.stru),
+         phi.stru = sub("Time", "T", phi.stru),
+         phi.stru = sub("time", "t", phi.stru),
+         phi.stru = sub("res.htch", "Hatch date", phi.stru),
+         phi.stru = sub("mass.gr", "Mass", phi.stru),
+         phi.stru = sub("flip.gr", "Flipper", phi.stru),
+         phi.stru = sub("tib.gr", "Tibio", phi.stru),
+         phi.stru = sub("Phi\\(\\~", "", phi.stru),
+         phi.stru = ifelse(Phi.SEASON == FALSE, str_replace(phi.stru, "SEASON", paste("SEASON", "\u2020", sep = "")), phi.stru),
+         phi.stru = ifelse(Phi.T == FALSE & !grepl("TT", phi.stru), str_replace(phi.stru, "T", paste("T", "\u2020", sep = "")), phi.stru),
+         phi.stru = ifelse(Phi.TT == FALSE, str_replace(phi.stru, "TT", paste("TT", "\u2020", sep = "")), phi.stru),
+         phi.stru = ifelse(Phi.mass.gr == FALSE, str_replace(phi.stru, "Mass", paste("Mass", "\u2020", sep = "")), phi.stru),
+         phi.stru = ifelse(Phi.flip.gr == FALSE, str_replace(phi.stru, "Flipper", paste("Flipper", "\u2020", sep = "")), phi.stru),
+         phi.stru = ifelse(Phi.tib.gr == FALSE, str_replace(phi.stru, "Tibio", paste("Tibio", "\u2020", sep = "")), phi.stru),
+         phi.stru = ifelse(phi.stru == "1", "Intercept only", phi.stru),
+         phi.stru = mod_call_to_structure(phi.stru)) %>% 
+  select(model = model.name, phi.stru)
+
+step4$model.table <- step4$model.table %>% 
+  data.frame() %>% 
+  full_join(step4_informative_wide)
+
+step4$model.table %>% view()
+
+
+saveRDS(step4, here("fitted_models/survival/step4"))
+
+
