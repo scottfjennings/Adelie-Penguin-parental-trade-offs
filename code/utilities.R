@@ -10,7 +10,7 @@
 run.models<-function(phi.stru, p.stru = "SEASON * sex + time") {
   phi.stru.list <- list(formula = formula(paste("~", phi.stru)))
   p.stru.list <- list(formula = formula(paste("~", p.stru)))
-zmod <- mark(penguins.process, penguins.ddl, model.parameters = list(Phi = phi.stru.list, p = p.stru.list), output = FALSE, chat = 1.25)
+zmod <- mark(penguins.process, penguins.ddl, model.parameters = list(Phi = phi.stru.list, p = p.stru.list), output = FALSE, chat = zchat)
 return(zmod)
 }
 
@@ -19,16 +19,20 @@ return(zmod)
 # To help ensure that multiplying se by some Z value provides appropriate CI, I also include a test for whether 95% CI calculated by this method are equal to 95% provided by R/RMark.
 
 # linear model version
-lm_parm_informative <- function(zmodel) {
-  zmod.name = deparse(substitute(zmodel))
-  
+lm_parm_informative <- function(zmodel, zmod.name) {
+ # zmod.name = deparse(substitute(zmodel)) 
+ #zmod.name = names(zmodel)  
+ #zmodel <- zmodel[[1]]
   zmodel_ci <- confint(zmodel)%>% 
                 data.frame() %>% 
                 rownames_to_column("parm") %>% 
     rename(lcl = X2.5..,
            ucl = X97.5..)
   
-  coef(summary(zmodel)) %>% 
+mod_call <- as.character(zmodel$call[2])
+mod_call <- sub(".*\\~ ", "", mod_call)
+  
+parms_informative <- coef(summary(zmodel)) %>% 
   data.frame() %>% 
   rownames_to_column("parm") %>% 
   filter(!grepl("ntercept", parm)) %>% 
@@ -39,14 +43,20 @@ lm_parm_informative <- function(zmodel) {
            ci95check = lcl == Estimate - (1.96 * Std..Error) & ucl == Estimate + (1.96 * Std..Error),
            informative95 = ifelse((lcl < 0 & ucl < 0) | (lcl > 0 & ucl > 0), TRUE, FALSE),
            informative85 = ifelse((lci85 < 0 & uci85 < 0) | (lci85 > 0 & uci85 > 0), TRUE, FALSE),
-           mod.name = zmod.name)
+           mod.name = zmod.name,
+           #mod.name = sub(".*\\$ ", "", mod.name),
+           mod.call = mod_call)
+return(parms_informative)
 }
 
 
 
-
 cjs_parm_informative <- function(zmodel, phi.p) {
-  zmod.name = deparse(substitute(zmodel))
+#  zmod.name = deparse(substitute(zmodel))
+  
+  model_name <- as.character(zmodel$model.name[1])
+model_name <- sub(".*\\~ ", "", model_name)
+  
   
   coef(zmodel) %>% 
   data.frame() %>% 
@@ -57,6 +67,43 @@ cjs_parm_informative <- function(zmodel, phi.p) {
            ci95check = lcl == estimate - (1.96 * se) & ucl == estimate + (1.96 * se),
            informative95 = ifelse((lcl < 0 & ucl < 0) | (lcl > 0 & ucl > 0), TRUE, FALSE),
            informative85 = ifelse((lci85 < 0 & uci85 < 0) | (lci85 > 0 & uci85 > 0), TRUE, FALSE),
-           mod.name = zmod.name)
+          # mod.name = zmod.name,
+           model.name = model_name)
 }
 #
+
+get_mod_call <- function(zmodel) {
+
+  zmod.name = deparse(substitute(zmodel)) 
+zmod.name <- sub(".*\\$ ", "", zmod.name)
+  
+  
+mod_call <- as.character(zmodel$call[2])
+mod_call <- sub(".*\\~ ", "", mod_call)
+  
+mod_call_df <- data.frame(mod.call = mod_call,
+                          mod.name = zmod.name)
+  return(mod_call_df)
+}
+
+
+
+#' Change variable names in model call to nicer versions for output in model tables
+#' 
+#'  Adds a nice 
+#'
+#' @param zmod.call column in data frame with the results of mod
+#'
+#' @return
+#' @export
+#'
+#' @examples
+mod_call_to_structure <- function(zmod.call) {
+  zmod.call = gsub("SEASON", "Yr", zmod.call)
+  zmod.call = gsub("sex", "Sex", zmod.call)
+  zmod.call = gsub("hatch", "Hatch", zmod.call)
+  zmod.call = gsub("weight.slope40", "Mass", zmod.call)
+  zmod.call = gsub("tibiotar.slope35", "Tibio", zmod.call)
+  zmod.call = gsub("flipper.slope40", "Flipper", zmod.call)
+  zmod.call = gsub("cr.age", paste("Cr", "\u00E8", "ching age", sep = ""), zmod.call)
+}
