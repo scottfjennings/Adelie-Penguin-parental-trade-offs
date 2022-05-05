@@ -1,6 +1,8 @@
 
 
 
+# in this stage investigating whether there was an effect of growth rate on survival across the entire provisioning period
+
 #ACR computer
 MarkPath="C:/Program Files (x86)/MARK"
 library(RMark)
@@ -18,7 +20,7 @@ source(here("code/utilities.R"))
 setwd(here("mark_output"))
 
 
-# this part of the analysis needs to be separate from step 3 because it uses the subset of chicks for which I could extimate growth rates
+# this part of the analysis needs to be separate from step 3 because it uses the subset of chicks for which I could estimate growth rates
 
 
 
@@ -76,7 +78,7 @@ penguins.ddl = make.design.data(penguins.process)
 run.models<-function(phi.stru, p.stru = "SEASON * sex + time") {
   phi.stru.list <- list(formula = formula(paste("~", phi.stru)))
   p.stru.list <- list(formula = formula(paste("~", p.stru)))
-zmod <- mark(penguins.process, penguins.ddl, model.parameters = list(Phi = phi.stru.list, p = p.stru.list), output = FALSE, chat = 1.25)
+zmod <- mark(penguins.process, penguins.ddl, model.parameters = list(Phi = phi.stru.list, p = p.stru.list), output = FALSE, chat = 1.16)
 return(zmod)
 }
 
@@ -232,6 +234,6 @@ step4$model.table <- step4$model.table %>%
 step4$model.table %>% view()
 
 
-saveRDS(step4, here("fitted_models/survival/step4"))
+saveRDS(step4, here("fitted_models/survival/step4_growth_surv"))
 
 
