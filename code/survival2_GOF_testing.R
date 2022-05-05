@@ -54,7 +54,7 @@ penguins=convert.inp(here("data/mark_in.inp"),
 					 "in.cr73", "in.cr74", "in.cr75", "in.cr76", "in.cr77", "in.cr78", "in.cr79", "in.cr80",
 					 "in.cr81", "in.cr82", "in.cr83", "in.cr84", "in.cr85", "in.cr86", "in.cr87", "in.cr88", 
 					 "in.cr89", "in.cr90", "in.cr91", "in.cr92", "in.cr93", "in.cr94", "in.cr95", "in.cr96",
-					 "in.cr97", "in.cr98", "cr.age", "fail.age", "cr.mass", "res.htch", "cr.flip", "cr.tib"), use.comments = TRUE) 
+					 "in.cr97", "in.cr98", "res.htch", "cr.age", "fail.age", "mass.gr", "tib.gr", "flip.gr", "cr.mass", "cr.flip", "cr.tib"), use.comments = TRUE) 
 
 
 		 
@@ -111,12 +111,11 @@ peng.for.gof <- peng.for.gof %>%
 
 peng.for.gof.proc=process.data(peng.for.gof,model="CJS",groups=c("SEASON", "sex"))
 
-release.gof(peng.for.gof.proc)
+penguins_release_gof <- release.gof(peng.for.gof.proc)
 # note, release.gof creates mxxx.tmp file
 # divide total Chi.square by total df to get estimate of c-hat
-# > 179.5428/144
-# [1] 1.246825
-c_hat = round(179.5428/144, 2)
+
+penguins_release_gof[3,1]/penguins_release_gof[3,2]
 
 
 
