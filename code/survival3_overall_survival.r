@@ -6,10 +6,7 @@
 #ACR computer
 MarkPath="C:/Program Files (x86)/MARK"
 library(RMark)
-library(lme4) 
 library(AICcmodavg)
-library(grid)
-library(ggplot2)
 library(tidyverse)
 library(R2ucare)
 library(here)
@@ -20,6 +17,7 @@ source(here("code/utilities.R"))
 # setting working directory only to control location for all the Mark output files
 setwd(here("mark_output"))
 
+zchat = 1.16
 
 
 # Nov 1 is season day 1 both years of this study. so begin.time = 50 makes analysis start on
@@ -219,7 +217,7 @@ step1.2_phi =collect.models(lx=c("phi.year.sex_p.sat", "phi.year_sex_p.sat", "ph
                               "phi.year.sex_lnT_hatch_p.sat", "phi.year_sex_lnT_hatch_p.sat", "phi.sex_lnT_hatch_p.sat", "phi.year_lnT_hatch_p.sat", 
                               "phi.int_p.sat"))
 
-model.table(step1.2_phi)
+model.table(step1.2_phi) %>% view()
 
 
 saveRDS(step1.2_phi, here("fitted_models/survival/step1.2_phi"))
@@ -272,19 +270,19 @@ p_informative_wide <- p_informative %>%
          p.stru = sub("in.cr", paste("Cr", "\u00E8", "che", sep = ""), p.stru),
          p.stru = sub("time", "t", p.stru),
          p.stru = sub("\\)", "", p.stru),
-         p.stru = ifelse(p.SEASON.sex == FALSE, str_replace(p.stru, "SEASON \\* sex", paste("(SEASON \\* sex)", "\u2020", sep = "")), p.stru),
-         p.stru = ifelse(p.SEASON == FALSE, str_replace(p.stru, "SEASON", paste("SEASON", "\u2020", sep = "")), p.stru),
-         p.stru = ifelse(p.sex == FALSE, str_replace(p.sex, "sex", paste("sex", "\u2020", sep = "")), p.stru),
-         p.stru = ifelse(p.T == FALSE, str_replace(p.T, "T", paste("T", "\u2020", sep = "")), p.stru),
-         p.stru = ifelse(p.TT == FALSE, str_replace(p.TT, "TT", paste("TT", "\u2020", sep = "")), p.stru),
-         p.stru = ifelse(p.lnT == FALSE, str_replace(p.lnT, "lnT", paste("lnT", "\u2020", sep = "")), p.stru),
+         p.stru = ifelse(p.SEASON.sex == FALSE, str_replace(p.stru, "SEASON \\* sex", sprintf(paste("(SEASON \\* sex)", "^\u2020^", sep = ""))), p.stru),
+         p.stru = ifelse(p.SEASON == FALSE, str_replace(p.stru, "SEASON", sprintf(paste("SEASON", "^\u2020^", sep = ""))), p.stru),
+         p.stru = ifelse(p.sex == FALSE, str_replace(p.stru, "sex", sprintf(paste("sex", "^\u2020^", sep = ""))), p.stru),
+         p.stru = ifelse(p.T == FALSE, str_replace(p.stru, "T", sprintf(paste("T", "^\u2020^", sep = ""))), p.stru),
+         p.stru = ifelse(p.TT == FALSE, str_replace(p.stru, "TT", sprintf(paste("TT", "^\u2020^", sep = ""))), p.stru),
+         p.stru = ifelse(p.lnT == FALSE, str_replace(p.stru, "lnT", sprintf(paste("lnT", "^\u2020^", sep = ""))), p.stru),
          p.stru = ifelse(p.stru == "1", "Intercept only", p.stru),
          p.stru = mod_call_to_structure(p.stru)) %>% 
   select(model = model.name, p.stru)
 
 step1.1_p$model.table <- step1.1_p$model.table %>% 
   data.frame() %>% 
-  full_join(p_informative_wide)
+  full_join(p_informative_wide, by = c("model"))
 
 step1.1_p$model.table %>% view()
 
@@ -337,12 +335,12 @@ phi_informative_wide <- phi_informative %>%
          phi.stru = sub("time", "t", phi.stru),
          phi.stru = sub("res.htch", "Hatch date", phi.stru),
          phi.stru = sub("Phi\\(\\~", "", phi.stru),
-         phi.stru = ifelse(Phi.SEASON.sex == FALSE, str_replace(phi.stru, "SEASON \\* sex", paste("(SEASON \\* sex)", "\u2020", sep = "")), phi.stru),
-         phi.stru = ifelse(Phi.SEASON == FALSE, str_replace(phi.stru, "SEASON", paste("SEASON", "\u2020", sep = "")), phi.stru),
-         phi.stru = ifelse(Phi.sex == FALSE, str_replace(phi.stru, "sex", paste("sex", "\u2020", sep = "")), phi.stru),
-         phi.stru = ifelse(Phi.T == FALSE & !grepl("TT", phi.stru), str_replace(phi.stru, "T", paste("T", "\u2020", sep = "")), phi.stru),
-         phi.stru = ifelse(Phi.TT == FALSE, str_replace(phi.stru, "TT", paste("TT", "\u2020", sep = "")), phi.stru),
-         phi.stru = ifelse(Phi.lnT == FALSE, str_replace(phi.stru, "lnT", paste("lnT", "\u2020", sep = "")), phi.stru),
+         phi.stru = ifelse(Phi.SEASON.sex == FALSE, str_replace(phi.stru, "SEASON \\* sex", sprintf(paste("(SEASON \\* sex)", "^\u2020^", sep = ""))), phi.stru),
+         phi.stru = ifelse(Phi.SEASON == FALSE, str_replace(phi.stru, "SEASON", sprintf(paste("SEASON", "^\u2020^", sep = ""))), phi.stru),
+         phi.stru = ifelse(Phi.sex == FALSE, str_replace(phi.stru, "sex", sprintf(paste("sex", "^\u2020^", sep = ""))), phi.stru),
+         phi.stru = ifelse(Phi.T == FALSE & !grepl("TT", phi.stru), str_replace(phi.stru, "T", sprintf(paste("T", "^\u2020^", sep = ""))), phi.stru),
+         phi.stru = ifelse(Phi.TT == FALSE, str_replace(phi.stru, "TT", sprintf(paste("TT", "^\u2020^", sep = ""))), phi.stru),
+         phi.stru = ifelse(Phi.lnT == FALSE, str_replace(phi.stru, "lnT", sprintf(paste("lnT", "^\u2020^", sep = ""))), phi.stru),
          phi.stru = ifelse(phi.stru == "1", "Intercept only", phi.stru),
          phi.stru = mod_call_to_structure(phi.stru)) %>% 
   select(model = model.name, phi.stru)
@@ -397,6 +395,11 @@ step1.4$model.table <- step1.4$model.table %>%
 step1.4$model.table %>% view()
 saveRDS(step1.4, here("fitted_models/survival/step1.4"))
 
+# forgot to change Phi in model.name
+step1.4 <- readRDS(here("fitted_models/survival/step1.4"))
+step1.4$model.table <- step1.4$model.table %>% 
+  mutate(model.structure = gsub("Phi", "\u03D5", model.structure))
+saveRDS(step1.4, here("fitted_models/survival/step1.4"))
 #
 # step 2. main variables of interest for overall survival: Age and creched status ----
 
@@ -478,31 +481,38 @@ phi.year_TT_hatch_incr_p.sat <- run.models(phi.stru = "SEASON + Time + I(Time^2)
 phi.year_T_hatch_incr_p.sat <- run.models(phi.stru = "SEASON + Time + res.htch + in.cr")
 phi.year_hatch_incr_p.sat <- run.models(phi.stru = "SEASON + res.htch + in.cr")
 # plus time varying age - this is the proper way to code the time-varying indiv covs
-phi.year_TT_hatch_age_p.sat <- run.models(phi.stru = "SEASON + Time + I(Time^2) + res.htch + dayold")
-phi.year_T_hatch_age_p.sat <- run.models(phi.stru = "SEASON + Time + res.htch + dayold")
-phi.year_hatch_age_p.sat <- run.models(phi.stru = "SEASON + res.htch + dayold")
+# age covs seem to represent the same thing as T; doesn't seem like age is meaningful to model
+#phi.year_TT_hatch_age_p.sat <- run.models(phi.stru = "SEASON + Time + I(Time^2) + res.htch + dayold")
+#phi.year_T_hatch_age_p.sat <- run.models(phi.stru = "SEASON + Time + res.htch + dayold")
+#phi.year_hatch_age_p.sat <- run.models(phi.stru = "SEASON + res.htch + dayold")
 
+ # these 2 models added 4/26/22 per KMD suggestion
+phi.year_T.incr_hatch_p.sat <- run.models(phi.stru = "SEASON + res.htch + Time * in.cr")
+phi.year_hatch_TT.incr_p.sat <- run.models(phi.stru = "SEASON + Time + I(Time^2) + res.htch + in.cr")
 
 # export some DMs to double check
 phi.year_T_hatch_incr_p.sat$design.matrix %>% write.csv(here("fitted_models/phi.year_TT_hatch_t_incr_p.sat.csv"))
 phi.year_T_hatch.age_p.sat$design.matrix %>% write.csv(here("fitted_models/phi.year_TT_hatch_t.incr_p.sat.csv"))
-
+phi.year_T_hatch_incr_p.sat$design.matrix %>% write.csv(here("fitted_models/phi.year_T_hatch_incr_p.sat.csv"))
 
 step2 <- collect.models(c("phi.year_TT_hatch_p.sat", "phi.year_T_hatch_p.sat", "phi.year_hatch_p.sat", 
                           #incr
                           "phi.year_TT_hatch_incr_p.sat", "phi.year_T_hatch_incr_p.sat", "phi.year_hatch_incr_p.sat", 
                           #age
-                          "phi.year_TT_hatch_age_p.sat", "phi.year_T_hatch_age_p.sat", "phi.year_hatch_age_p.sat"))
+                          #"phi.year_TT_hatch_age_p.sat", "phi.year_T_hatch_age_p.sat", "phi.year_hatch_age_p.sat"
+                          "phi.year_T.incr_hatch_p.sat"))
 
 
 saveRDS(step2, here("fitted_models/survival/step2"))
 
-
+# still not totally sure on coding in.cr
+#test <- run.models(phi.stru = "SEASON + Time + res.htch + time:in.cr")
+#test2 <- run.models(phi.stru = "SEASON + Time + res.htch + time+in.cr")
+#test3 <- run.models(phi.stru = "SEASON + Time + res.htch + time*in.cr")
+#test4 <- run.models(phi.stru = "in.cr")
 # check for uninformative parms in step 2 ----
 
 step2 <- readRDS(here("fitted_models/survival/step2"))
-
-
 
 step2_mods <- step2[-length(step2)]
 
@@ -532,7 +542,7 @@ step2_informative <- step2_informative %>%
 step2_informative_wide <- step2_informative %>% 
            filter(!is.na(parm)) %>% 
   pivot_wider(id_cols = model.name, names_from = parm, values_from = informative85) %>% 
-  mutate(across(c("Phi.T", "Phi.TT", "Phi.res.htch", "Phi.in.cr", "Phi.dayold"), ~replace_na(., TRUE))) %>% 
+  mutate(across(c("Phi.T", "Phi.TT", "Phi.res.htch", "Phi.in.cr", "Phi.T.in.cr"), ~replace_na(., TRUE))) %>% 
   mutate(phi.stru = gsub("\\)p\\(\\~SEASON \\* sex \\+ time\\)", "", model.name),
          phi.stru = gsub(":", ".", phi.stru),
          phi.stru = sub("resid.", "", phi.stru),
@@ -540,26 +550,30 @@ step2_informative_wide <- step2_informative %>%
          phi.stru = sub("SEASON1314", "SEASON", phi.stru),
          phi.stru = sub("Time \\+ I\\(Time\\^2\\)", "TT", phi.stru),
          phi.stru = sub("Time", "T", phi.stru),
-         phi.stru = sub("in.cr", paste("Cr", "\u00E8", "che", sep = ""), phi.stru),
          phi.stru = sub("time", "t", phi.stru),
          phi.stru = sub("res.htch", "Hatch date", phi.stru),
+         phi.stru = sub("dayold", "Age", phi.stru),
          phi.stru = sub("Phi\\(\\~", "", phi.stru),
-         phi.stru = ifelse(Phi.SEASON == FALSE, str_replace(phi.stru, "SEASON", paste("SEASON", "\u2020", sep = "")), phi.stru),
-         phi.stru = ifelse(Phi.T == FALSE & !grepl("TT", phi.stru), str_replace(phi.stru, "T", paste("T", "\u2020", sep = "")), phi.stru),
-         phi.stru = ifelse(Phi.TT == FALSE, str_replace(phi.stru, "TT", paste("TT", "\u2020", sep = "")), phi.stru),
+         phi.stru = ifelse(Phi.SEASON == FALSE, str_replace(phi.stru, "SEASON", sprintf(paste("SEASON", "^\u2020^", sep = ""))), phi.stru),
+         phi.stru = ifelse(Phi.T == FALSE & !grepl("TT", phi.stru), str_replace(phi.stru, "T", sprintf(paste("T", "^\u2020^", sep = ""))), phi.stru),
+         phi.stru = ifelse(Phi.TT == FALSE, str_replace(phi.stru, "TT", sprintf(paste("TT", "^\u2020^", sep = ""))), phi.stru),
+         phi.stru = ifelse(Phi.T.in.cr == FALSE, str_replace(phi.stru, "T \\* in.cr", sprintf(paste("\\(T \\* in.cr\\)", "^\u2020^", sep = ""))), phi.stru),
+         phi.stru = sub("in.cr", paste("Cr", "\u00E8", "che", sep = ""), phi.stru), # easier to have this after the uniformative edit
+         #phi.stru = ifelse(Phi.dayold == FALSE, str_replace(phi.stru, "Age", paste("Age", "^\u2020^", sep = "")), phi.stru),
          phi.stru = ifelse(phi.stru == "1", "Intercept only", phi.stru),
          phi.stru = mod_call_to_structure(phi.stru)) %>% 
   select(model = model.name, phi.stru)
 
 step2$model.table <- step2$model.table %>% 
   data.frame() %>% 
-  full_join(step2_informative_wide) %>% 
-  select(-model.structure)
+  full_join(step2_informative_wide)
 
 step2$model.table %>% view()
 
 
 saveRDS(step2, here("fitted_models/survival/step2"))
+
+#
 # model averaging ----
 
 
@@ -567,7 +581,7 @@ saveRDS(step2, here("fitted_models/survival/step2"))
 
 step2 <- readRDS(here("fitted_models/survival/step2"))
 
-step2_mod_av_phi = model.average(step2, "Phi", vcv=TRUE, drop = FALSE)
+step2_mod_av_phi = model.average(step2, "Phi", vcv=TRUE, drop = TRUE)
 
 saveRDS(step2_mod_av_phi, here("fitted_models/survival/step2_mod_av_phi"))
 
