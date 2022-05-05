@@ -41,260 +41,106 @@ zmod_coefCI <- cbind(coef(zmod), confint(zmod)) %>%
          adj.r2 = format(round(adj.r2, 2), nsmall = 2))
 }
 
-basic_mod_name_fix <- function(zmod.table) {
-  zmod.table <- zmod.table %>% 
-    mutate(Modnames = gsub("\\.", " * ", Modnames),
-           Modnames = gsub("_", " + ", Modnames),
-           Modnames = gsub("year", "Year", Modnames),
-           Modnames = gsub("sex", "Sex", Modnames),
-           Modnames = gsub("age", "Creching age", Modnames)
-         )
-}
-```
-
-
-
-```{r }
-# creching age output from best models ----
-cr_age_step2_mods <- readRDS(here("fitted_models/cr_timing/cr_age_step2_mods"))
-
-cr_age_mod_tab <- aictab(cr_age_step2_mods, names(cr_age_step2_mods)) %>% 
-  data.frame() %>% 
-  mutate(Delta_AICc = round(Delta_AICc, 2))
-
-cr_age_best_mods <- cr_age_mod_tab %>%  
-  filter(Delta_AICc < 4)
-
-cr_age_next_best <- cr_age_mod_tab %>%  
-  filter(Delta_AICc > 4) %>% 
-  filter(Delta_AICc == min(Delta_AICc))
-
-
-# coefficients, R2
-
-get_cr_age_coefCI_lm <- function(zmod.name) {
-  zmod <- cr_age_step2_mods[zmod.name][[1]]
-zmod_coefCI <- get_coef_ci(zmod, zmod.name)
-}
-
-
-cr_age_coefCI <- map_df(cr_age_best_mods$Modnames, get_cr_age_coefCI_lm) %>%
+multi_mod_coefs <- function(mods) {
+  
+coefCI <- map2_df(mods[-length(mods)], names(mods[-length(mods)]), get_coef_ci) %>%
   rename(Modnames = mod) %>% 
-  full_join(cr_age_best_mods) %>% 
-  arrange(Delta_AICc) %>% 
-  dplyr::select(Modnames, resid.hatch, growth, SEASON1314, Delta_AICc, adj.r2) %>% 
-  basic_mod_name_fix() %>% 
-  mutate(Modnames = gsub("hatch", "Hatch date", Modnames),
-         Modnames = gsub("mass", "Mass growth", Modnames),
-         Modnames = gsub("tib", "Tibiotarsus growth", Modnames),
-         Modnames = gsub("flip", "Flipper growth", Modnames)
-         )
+  full_join(mods$model.table) %>%  
+  filter(Delta_AICc < 4) %>% 
+  arrange(Delta_AICc)%>% 
+  mutate(Delta_AICc = round(Delta_AICc, 2)) %>% 
+  dplyr::select(-Modnames, -ModelLik, -AICcWt, -LL, -Cum.Wt, -AICc, -K)
+}
 
-```
-<br>
-Creching age  
-```{r}
 
-flextable(cr_age_coefCI) %>% 
-  add_header_row(values = c("", "Estimated coefficients (95% CI)", ""), colwidths = c(1, 3, 2)) %>% 
-  set_header_labels(Modnames = "Model structure",
+coef_outtable <- function(coefCI_tab) {
+  
+flextable(coefCI_tab) %>% 
+  add_header_row(values = c("", "Estimated coefficients (95% CI)", ""), colwidths = c(1, (ncol(coefCI_tab) - 3), 2)) %>% 
+  set_header_labels(model.structure = "Model structure",
                     resid.hatch = "Hatch date",
                     SEASON1314 = "Year",
                     growth = "Growth rate",
-                    Delta_AICc = "\u0394 AICc") %>% 
+                    Delta_AICc = "\u0394 AICc",
+                    sexM = "Sex",
+                    cr.age = paste("Cr", "\u00E8", "ching age", sep = "")) %>% 
   compose(i = 2, j = "adj.r2", part = "header",
     value = as_paragraph(
       "Adj. R",
       as_sup("2")
     ) ) %>% 
   border_remove() %>% 
-  border(i = 2, j = 2:4, border.top = fp_border(color = "black"), part = "header") %>% 
+  border(i = 2, j = 2:(ncol(coefCI_tab)-2), border.top = fp_border(color = "black"), part = "header") %>% 
   border(i = 1, border.top = fp_border(color = "black"), part = "header") %>% 
   border(i = 1, border.top = fp_border(color = "black"), part = "body") %>% 
-  border(i = 4, border.bottom = fp_border(color = "black"), part = "body") %>%
+  border(i = nrow(coefCI_tab), border.bottom = fp_border(color = "black"), part = "body") %>%
   width(1, width = 2) %>% 
-  width(2:4, width = 1.6) %>% 
-  width(5:6, width = 0.6) %>% 
+  width(2:(ncol(coefCI_tab)-2), width = 1.6) %>% 
+  width((ncol(coefCI_tab)-1):ncol(coefCI_tab), width = 0.6) %>% 
   fit_to_width(max_width = 7.5) %>% 
-  align(j = 2:6, align = "center", part = "all") %>% 
-  footnote(i = 2, j = 5, part = "header", value = as_paragraph(paste("next best model \u0394 AICc =", cr_age_next_best$Delta_AICc[[1]])))%>% 
-  colformat_md() %>% 
-  fontsize(size = 9, part = "footer")
-
-```
-
-
-
-```{r}
-
-cr_mass_step2_mods <- readRDS(here("fitted_models/cr_timing/cr_mass_step2_mods"))
-
-cr_mass_mod_tab <- aictab(cr_mass_step2_mods, names(cr_mass_step2_mods)) %>% 
-  data.frame() %>% 
-  mutate(Delta_AICc = round(Delta_AICc, 2))
-
-cr_mass_best_mods <- cr_mass_mod_tab %>%  
-  filter(Delta_AICc < 2) %>% 
-  arrange(Delta_AICc)
-
-cr_mass_next_best <- cr_mass_mod_tab %>%  
-  filter(Delta_AICc > 2) %>% 
-  filter(Delta_AICc == min(Delta_AICc))
-
-# coefficients, R2
-get_cr_mass_coefCI_lm <- function(zmod.name) {
-  zmod <- cr_mass_step2_mods[zmod.name][[1]]
-zmod_coefCI <- get_coef_ci(zmod, zmod.name)
-}
-
-cr_mass_coefCI <- map_df(cr_mass_best_mods$Modnames, get_cr_mass_coefCI_lm) %>%
-  rename(Modnames = mod) %>% 
-  full_join(cr_mass_best_mods) %>% 
-  arrange(Delta_AICc) %>% 
-  dplyr::select(Modnames, cr.age, growth, sexM, SEASON1314, Delta_AICc, adj.r2) %>% 
-  basic_mod_name_fix() %>% 
-  mutate(Modnames = gsub("mass.", "", Modnames),
-         Modnames = gsub("growth", "Mass growth", Modnames)
-         )
-
-
-```
-
-
-
-```{r}
-
-cr_flip_step2_mods <- readRDS(here("fitted_models/cr_timing/cr_flip_step2_mods"))
-
-cr_flip_mod_tab <- aictab(cr_flip_step2_mods, names(cr_flip_step2_mods)) %>% 
-  data.frame() %>% 
-  mutate(Delta_AICc = round(Delta_AICc, 2))
-
-cr_flip_best_mods <- cr_flip_mod_tab %>%  
-  filter(Delta_AICc < 2) %>% 
-  arrange(Delta_AICc)
-
-cr_flip_next_best <- cr_flip_mod_tab %>%  
-  filter(Delta_AICc > 2) %>% 
-  filter(Delta_AICc == min(Delta_AICc))
-
-# coefficients, R2
-get_cr_flip_coefCI_lm <- function(zmod.name) {
-  zmod <- cr_flip_step2_mods[zmod.name][[1]]
-zmod_coefCI <- get_coef_ci(zmod, zmod.name)
+  align(j = 2:ncol(coefCI_tab), align = "center", part = "all")
+  #colformat_md() 
 
 }
 
-cr_flip_coefCI <- map_df(cr_flip_best_mods$Modnames, get_cr_flip_coefCI_lm) %>%
-  rename(Modnames = mod) %>% 
-  full_join(cr_flip_best_mods) %>% 
-  arrange(Delta_AICc) %>% 
-  dplyr::select(Modnames, cr.age, growth, SEASON1314, Delta_AICc, adj.r2) %>% 
-  basic_mod_name_fix() %>%  
-  mutate(Modnames = gsub("flip.", "", Modnames),
-         Modnames = gsub("growth", "Flipper growth", Modnames)
-         )
-
-
 ```
 
-```{r}
 
-cr_tib_step2_mods <- readRDS(here("fitted_models/cr_timing/cr_tib_step2_mods"))
+<br>
+Creching age
+```{r }
+# creching age output from best models ----
 
-cr_tib_mod_tab <- aictab(cr_tib_step2_mods, names(cr_tib_step2_mods)) %>% 
-  data.frame() %>% 
-  mutate(Delta_AICc = round(Delta_AICc, 2))
 
-cr_tib_best_mods <- cr_tib_mod_tab %>%  
-  filter(Delta_AICc < 2) %>% 
-  arrange(Delta_AICc)
+cr_age_coefCI <- readRDS(here("fitted_models/cr_timing/cr_age_step2_mods")) %>% 
+  multi_mod_coefs() %>% 
+  dplyr::select(model.structure, SEASON1314, resid.hatch, growth, Delta_AICc, adj.r2) 
 
-cr_tib_next_best <- cr_tib_mod_tab %>%  
-  filter(Delta_AICc > 2) %>% 
-  filter(Delta_AICc == min(Delta_AICc))
-
-# coefficients, R2
-get_cr_tib_coefCI_lm <- function(zmod.name) {
-  zmod <- cr_tib_step2_mods[zmod.name][[1]]
-zmod_coefCI <- get_coef_ci(zmod, zmod.name)
-}
-
-cr_tib_coefCI <- map_df(cr_tib_best_mods$Modnames, get_cr_tib_coefCI_lm) %>%
-  rename(Modnames = mod) %>% 
-  full_join(cr_tib_best_mods) %>% 
-  arrange(Delta_AICc) %>% 
-  dplyr::select(Modnames, cr.age, growth, SEASON1314, Delta_AICc, adj.r2) %>% 
-  basic_mod_name_fix() %>%  
-  mutate(Modnames = gsub("tib.", "", Modnames),
-         Modnames = gsub("growth", "Tibiotarsus growth", Modnames)
-         )
-
+coef_outtable(cr_age_coefCI)
 
 ```
 
 
-
-```{r}
-
-cr_size_out_table <- rbind(
-  # mass rows
-  data.frame(Modnames = "Competitive creching mass model", cr.age = "", growth = "", sexM = "", SEASON1314 = "", Delta_AICc = "", adj.r2 = ""),
-  cr_mass_coefCI,
-  data.frame(Modnames = paste("next best model \u0394 AICc = ", cr_mass_next_best$Delta_AICc[[1]]), cr.age = "", growth = "", sexM = "", SEASON1314 = "", Delta_AICc = "", adj.r2 = ""),
-  # flipper rows
-  data.frame(Modnames = "Competitive creching flipper length model", cr.age = "", growth = "", sexM = "", SEASON1314 = "", Delta_AICc = "", adj.r2 = ""),
-  cr_flip_coefCI %>% mutate(sexM = NA),
-  data.frame(Modnames = paste("next best model \u0394 AICc = ", cr_flip_next_best$Delta_AICc[[1]]), cr.age = "", growth = "", sexM = "", SEASON1314 = "", Delta_AICc = "", adj.r2 = ""),
-    # tib rows
-    data.frame(Modnames = "Competitive creching tibiotarsus length models", cr.age = "", growth = "", sexM = "", SEASON1314 = "", Delta_AICc = "", adj.r2 = ""),
-  cr_tib_coefCI %>% mutate(sexM = NA),
-  data.frame(Modnames = paste("next best model \u0394 AICc = ", cr_tib_next_best$Delta_AICc[[1]]), cr.age = "", growth = "", sexM = "", SEASON1314 = "", Delta_AICc = "", adj.r2 = "")
-)
-
-```
-   
 <br>
 <br>
    
 
 Creching size  
 ```{r}
-cr_size_out_table %>% 
-  select(-Delta_AICc) %>% 
-  flextable() %>% 
-  add_header_row(values = c("", "Estimated coefficients (95% CI)", ""), colwidths = c(1, 4, 1)) %>% 
-  set_header_labels(Modnames = "Model structure",
-                    cr.age = "Creching age",
-                    sexM = "Sex",
-                    SEASON1314 = "Year",
-                    growth = "Growth rate"
-                    #Delta_AICc = "\u0394 AICc"
-                    ) %>% 
-  compose(i = 2, j = "adj.r2", part = "header",
-    value = as_paragraph(
-      "Adj. R",
-      as_sup("2")
-    ) ) %>% 
-  border_remove() %>% 
-  border(i = 1, border.top = fp_border(color = "black"), part = "header") %>% # header top border
-  border(i = 1, j = 2:5, border.bottom = fp_border(color = "black"), part = "header") %>% # coefs cols border bottom
-  border(i = 2, border.bottom = fp_border(color = "black"), part = "header") %>% # header border bottom
-  border(i = 1, j = 1, border.bottom = fp_border(color = "black"), part = "body") %>% # mass top sub border
-  border(i = 2 + nrow(cr_mass_coefCI), border.bottom = fp_border(color = "black"), part = "body") %>% # mass bottom border
-  border(i = 1 + 2 + nrow(cr_mass_coefCI), j = 1, border.bottom = fp_border(color = "black"), part = "body") %>% # flipper top sub border
-  border(i = 2 + nrow(cr_mass_coefCI) + 2 + nrow(cr_flip_coefCI), border.bottom = fp_border(color = "black"), part = "body") %>% # flipper bottom border
-  border(i = 1 + 2 + nrow(cr_mass_coefCI)+ 2 + nrow(cr_flip_coefCI), j = 1, border.bottom = fp_border(color = "black"), part = "body") %>% # tib top sub border
-  border(i = 2 + nrow(cr_mass_coefCI) + 2 + nrow(cr_flip_coefCI) + 2 + nrow(cr_tib_coefCI), border.bottom = fp_border(color = "black"), part = "body") %>% # tib bottom border
-  width(1, width = 2.6) %>% 
-  width(2:5, width = 1.6) %>% 
-  width(6, width = 0.5) %>% 
-  fit_to_width(max_width = 7.5) %>% 
-  align(j = 2:6, align = "center", part = "all") %>% 
-  colformat_md()%>% 
-  fontsize(size = 9, part = "all")
 
+cr_mass_coefCI <- readRDS(here("fitted_models/cr_timing/cr_mass_step2_mods")) %>% 
+  multi_mod_coefs() %>% 
+  select(-sexM) # uninformative 
+
+cr_flip_coefCI <- readRDS(here("fitted_models/cr_timing/cr_flip_step2_mods")) %>% 
+  multi_mod_coefs()
+
+cr_tib_coefCI <- readRDS(here("fitted_models/cr_timing/cr_tib_step2_mods")) %>% 
+  multi_mod_coefs() 
+
+cr_size_out_table <- bind_rows(
+  # mass rows
+  data.frame(model.structure = paste("Cr", "\u00E8", "ching mass", sep = "")),
+  cr_mass_coefCI,
+  # flipper rows
+  data.frame(model.structure = paste("Cr", "\u00E8", "ching flipper length", sep = "")),
+  cr_flip_coefCI,
+    # tib rows
+    data.frame(model.structure = paste("Cr", "\u00E8", "ching tibiotarsus length", sep = "")),
+  cr_tib_coefCI) %>% 
+  select(model.structure, SEASON1314, resid.hatch, growth, cr.age, Delta_AICc, adj.r2)
+
+cr_size_out_table <- cr_size_out_table %>% 
+  mutate(across(names(cr_size_out_table[2:ncol(cr_size_out_table)]), ~ifelse(grepl("model", model.structure) & is.na(.), "", .)))
+
+coef_outtable(cr_size_out_table) %>% 
+  border(i = 1, j = 1, border.bottom = fp_border(color = "black"), part = "body") %>% # mass top partial
+  border(i = 1 + nrow(cr_mass_coefCI), border.bottom = fp_border(color = "black"), part = "body") %>% # mass bottom border
+  border(i = 2 + nrow(cr_mass_coefCI), j = 1, border.bottom = fp_border(color = "black"), part = "body") %>% # flipper top partial
+  border(i = 1 + nrow(cr_mass_coefCI) + 1 + nrow(cr_flip_coefCI), border.bottom = fp_border(color = "black"), part = "body") %>% # flipper bottom border
+  border(i = 1 + nrow(cr_mass_coefCI)+ 2 + nrow(cr_flip_coefCI), j = 1, border.bottom = fp_border(color = "black"), part = "body") # tib top partial
 ```
+   
 
 <br>
 <br>
@@ -302,12 +148,11 @@ cr_size_out_table %>%
 Creche period survival
 ```{r }
 # creching age output from best models ----
-cr_age_size_surv <- readRDS(here("fitted_models/survival/cr_age_size_models"))
+cr_age_size_surv <- readRDS(here("fitted_models/survival/step6_cr_timing_surv"))
 
-cr_age_size_surv_tab <- model.table(cr_age_size_surv) %>% 
-  data.frame()
+cr_age_size_surv_tab <- cr_age_size_surv$model.table
 
-int_deviance <- cr_age_size_surv$Phi.dot$results$deviance
+int_deviance <- readRDS(here("fitted_models/survival/step5.2_creched_phi"))$phi.int_p.sat$results$deviance
 
 get_phi_betas <- function(zmod.name) {
   zmod <- cr_age_size_surv[zmod.name]
@@ -317,45 +162,38 @@ get_phi_betas <- function(zmod.name) {
     mutate(model = zmod[[1]]$model.name,
            mod.name = names(zmod),
            dev.expl = zmod[[1]]$results$deviance) %>% 
-    filter(grepl("Phi", coef), !grepl("Intercept", coef), coef != "Phi:I(Time^2)", coef != "Phi:Time")
+    filter(grepl("Phi", coef), !grepl("Intercept", coef))
 }
 
-betas <- map_df(names(cr_age_size_surv[1:10]), get_phi_betas)
+betas <- map_df(names(cr_age_size_surv), get_phi_betas)
 
-aic_betas <- full_join(cr_age_size_surv_tab %>% select(model, DeltaQAICc), betas) %>% 
+aic_betas <- full_join(cr_age_size_surv_tab %>% select(model, phi.stru, DeltaQAICc), betas) %>% 
   filter(DeltaQAICc < 2)
 
 aic_beta_table <- aic_betas %>% 
   select(-model, -se) %>% 
   rename(est = estimate, lci = lcl, uci = ucl) %>% 
-  mutate(coef = case_when(grepl("cr.", coef) ~ "Creching size",
-                          grepl("SEASON", coef) ~ "Year",
-                          grepl("htch", coef) ~ "Hatch date",
-                          grepl("tib.gr", coef) ~ "Tibiotarsus growth")) %>% 
+  mutate(coef = gsub("Phi\\:", "", coef),
+         coef = gsub("SEASON1314", "Yr", coef),
+         coef = gsub("log\\(Time \\+ 1\\)", "Time", coef),
+         coef = gsub("Time", "Time", coef),
+         coef = ifelse(grepl("cr\\.", coef), "Cr.size", coef)) %>% 
   #mutate(across(c(est, lci, uci), ~format(round(., 4), nsmall = 4))) %>% 
    mutate(across(c(est, lci, uci), 
-             ~ case_when(coef == "Year" ~ format(round(., 2), nsmall = 2),
-                         coef == "Hatch day" ~ format(round(., 3), nsmall = 3),
-                         coef == "Creching size" ~ format(round(., 4), nsmall = 4)))) %>% 
+             ~ case_when(coef %in% c("Yr", "Time") ~ format(round(., 2), nsmall = 2),
+                         coef == "Cr.size" ~ format(round(., 3), nsmall = 3)))) %>% 
   mutate(across(c(est, lci, uci), ~trimws(.))) %>% 
   mutate(coef.ci = paste(est, " (", lci, "; ", uci, ")", sep = ""),
          DeltaQAICc = round(DeltaQAICc, 2)) %>% 
-  pivot_wider(id_cols = c(mod.name, DeltaQAICc), names_from = coef, values_from = coef.ci) %>% 
-  relocate(DeltaQAICc, .after = last_col()) %>% 
-  rename(Modnames = mod.name) %>% 
-  mutate(Modnames = gsub("Phi.", "", Modnames),
-         Modnames = gsub("_", " + ", Modnames),
-         Modnames = gsub("SEASON", "Year", Modnames),
-         Modnames = gsub("hatch", "Hatch date", Modnames),
-         Modnames = gsub("crmass", "Creching mass", Modnames),
-         Modnames = gsub("crtib", "Creching tibiotarsus", Modnames),
-         Modnames = gsub("crflip", "Creching flipper", Modnames)
-         )
+  pivot_wider(id_cols = c(phi.stru, DeltaQAICc), names_from = coef, values_from = coef.ci) %>% 
+  relocate(Cr.size, .after = last_col()) %>% 
+  relocate(DeltaQAICc, .after = last_col())
 
 flextable(aic_beta_table) %>% 
   add_header_row(values = c("", "Estimated coefficients (95% CI)", ""), colwidths = c(1, 3, 1)) %>% 
-  set_header_labels(Modnames = "Model structure",
-                    growth = "Growth rate",
+  set_header_labels(phi.stru = "Model structure",
+                    Time = "Time\n(TT or lnT)",
+                    Cr.size = "Creching size\n(flipper, mass or tibio)",
                     DeltaQAICc = "\u0394 QAICc"
                     ) %>% 
   border_remove() %>% 
@@ -363,13 +201,12 @@ flextable(aic_beta_table) %>%
   border(i = 1, j = 2:4, border.bottom = fp_border(color = "black"), part = "header") %>% # coefs cols border bottom
   border(i = 2, border.bottom = fp_border(color = "black"), part = "header") %>% # header border bottom
   border(i = nrow(aic_beta_table), border.bottom = fp_border(color = "black"), part = "body") %>% # mass top sub border
-  width(1, width = 2.6) %>% 
-  width(2:4, width = 1.6) %>% 
+  width(1, width = 2.5) %>% 
+  width(2:4, width = 1.5) %>% 
   width(5, width = 0.6) %>% 
   fit_to_width(max_width = 7.5) %>% 
-  align(j = 2:5, align = "center", part = "all") %>% 
-  colformat_md() %>% 
-  footnote(i = 1, j = 2, part = "header", value = as_paragraph(paste("Values for main and quadratic time effects not shown."))) %>% 
-  fontsize(size = 9, part = "all")
+  autofit() %>% 
+  align(j = 2:5, align = "center", part = "all") 
+  #colformat_md() 
 
 ```
