@@ -73,10 +73,10 @@ cr_tib_informative_wide <- cr_tib_informative %>%
   mutate(parm = ifelse(mod.name == "int", "intercept", parm)) %>% 
   pivot_wider(id_cols = c(mod.name, mod.call), names_from = parm, values_from = informative85) %>% 
   mutate(across(c("SEASON", "hatch", "sex", "sex.SEASON"), ~replace_na(., TRUE))) %>% 
-  mutate(mod.call = ifelse(sex.SEASON == FALSE, str_replace(mod.call, "sex \\* SEASON", paste("(sex \\* SEASON)", "\u2020", sep = "")), mod.call),
-         mod.call = ifelse(sex == FALSE, str_replace(mod.call, "sex", paste("sex", "\u2020", sep = "")), mod.call),
-         mod.call = ifelse(hatch == FALSE, str_replace(mod.call, "hatch", paste("hatch", "\u2020", sep = "")), mod.call),
-         mod.call = ifelse(SEASON == FALSE, str_replace(mod.call, "SEASON", paste("SEASON", "\u2020", sep = "")), mod.call),
+  mutate(mod.call = ifelse(sex.SEASON == FALSE, str_replace(mod.call, "sex \\* SEASON", sprintf(paste("(sex \\* SEASON)", "^\u2020^", sep = ""))), mod.call),
+         mod.call = ifelse(sex == FALSE, str_replace(mod.call, "sex", sprintf(paste("sex", "^\u2020^", sep = ""))), mod.call),
+         mod.call = ifelse(hatch == FALSE, str_replace(mod.call, "hatch", sprintf(paste("hatch", "^\u2020^", sep = ""))), mod.call),
+         mod.call = ifelse(SEASON == FALSE, str_replace(mod.call, "SEASON", sprintf(paste("SEASON", "^\u2020^", sep = ""))), mod.call),
          mod.call = ifelse(mod.name == "int", "Intercept only", mod.call),
          mod.call = mod_call_to_structure(mod.call)) %>% 
   select(Modnames = mod.name, model.structure = mod.call)
@@ -131,10 +131,10 @@ cr_tib2_informative_wide <- cr_tib2_informative %>%
   mutate(parm = ifelse(mod.name == "int", "intercept", parm)) %>% 
   pivot_wider(id_cols = c(mod.name, mod.call), names_from = parm, values_from = informative85) %>% 
   mutate(across(c("SEASON", "hatch", "tibiotar.slope35", "cr.age"), ~replace_na(., TRUE))) %>% 
-  mutate(mod.call = ifelse(hatch == FALSE, str_replace(mod.call, "hatch", paste("hatch", "\u2020", sep = "")), mod.call),
-         mod.call = ifelse(SEASON == FALSE, str_replace(mod.call, "SEASON", paste("SEASON", "\u2020", sep = "")), mod.call),
-         mod.call = ifelse(tibiotar.slope35 == FALSE, str_replace(mod.call, "tibiotar.slope35", paste("tibiotar.slope35", "\u2020", sep = "")), mod.call),
-         mod.call = ifelse(cr.age == FALSE, str_replace(mod.call, "cr.age", paste("cr.age", "\u2020", sep = "")), mod.call),
+  mutate(mod.call = ifelse(hatch == FALSE, str_replace(mod.call, "hatch", sprintf(paste("hatch", "^\u2020^", sep = ""))), mod.call),
+         mod.call = ifelse(SEASON == FALSE, str_replace(mod.call, "SEASON", sprintf(paste("SEASON", "^\u2020^", sep = ""))), mod.call),
+         mod.call = ifelse(tibiotar.slope35 == FALSE, str_replace(mod.call, "tibiotar.slope35", sprintf(paste("tibiotar.slope35", "^\u2020^", sep = ""))), mod.call),
+         mod.call = ifelse(cr.age == FALSE, str_replace(mod.call, "cr.age", sprintf(paste("cr.age", "^\u2020^", sep = ""))), mod.call),
          mod.call = ifelse(mod.name == "int", "Intercept only", mod.call),
          mod.call = mod_call_to_structure(mod.call)) %>% 
   select(Modnames = mod.name, model.structure = mod.call)
