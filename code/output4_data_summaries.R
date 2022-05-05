@@ -372,3 +372,122 @@ cr_age_wrapper <- function(zcr.size) {
   out.cr.age = rbind(m12, f12, m13, f13) %>% 
     mutate(cr.size = zcr.size)
   }
+
+
+# want to get estimates for guarded survival up until the last chick creched each year, and only get creched survival estimates from the first creched chick onward
+ana_table %>% 
+  group_by(SEASON) %>% 
+  summarise(min.cr = min(cr.seasday, na.rm = TRUE), 
+            max.cr = max(cr.seasday, na.rm = TRUE), 
+            mean.cr = mean(cr.seasday, na.rm = TRUE))
+
+
+cr_mod <- readRDS(here("fitted_models/survival/step2"))$phi.year_T_hatch_incr_p.sat
+
+cr_mod$results$beta[1:5,]
+
+
+
+# check which PIMS correspond to the desired days
+PIMS(cr_mod, parameter = "Phi", simplified = FALSE)
+
+# mean creche day indices are 19 and 1175
+
+guard_data12 = data.frame(in.cr50 = 0:1, 
+                          in.cr51 = 0:1, 
+                          in.cr52 = 0:1, 
+                          in.cr53 = 0:1, 
+                          in.cr54 = 0:1, 
+                          in.cr55 = 0:1, 
+                          in.cr56 = 0:1, 
+                          in.cr57 = 0:1, 
+                          in.cr58 = 0:1, 
+                          in.cr59 = 0:1, 
+                          in.cr60 = 0:1, 
+                          in.cr61 = 0:1, 
+                          in.cr62 = 0:1, 
+                          in.cr63 = 0:1, 
+                          in.cr64 = 0:1, 
+                          in.cr65 = 0:1, 
+                          in.cr66 = 0:1, 
+                          in.cr67 = 0:1, 
+                          in.cr68 = 0:1, 
+                          in.cr69 = 0:1, 
+                          in.cr70 = 0:1, 
+                          in.cr71 = 0:1, 
+                          in.cr72 = 0:1, 
+                          in.cr73 = 0:1, 
+                          in.cr74 = 0:1, 
+                          in.cr75 = 0:1, 
+                          in.cr76 = 0:1, 
+                          in.cr77 = 0:1, 
+                          in.cr78 = 0:1, 
+                          in.cr79 = 0:1, 
+                          in.cr80 = 0:1, 
+                          in.cr81 = 0:1, 
+                          in.cr82 = 0:1, 
+                          in.cr83 = 0:1, 
+                          in.cr84 = 0:1, 
+                          in.cr85 = 0:1, 
+                          in.cr86 = 0:1, 
+                          in.cr87 = 0:1, 
+                          in.cr88 = 0:1, 
+                          in.cr89 = 0:1, 
+                          in.cr90 = 0:1, 
+                          in.cr91 = 0:1, 
+                          in.cr92 = 0:1, 
+                          in.cr93 = 0:1, 
+                          in.cr94 = 0:1, 
+                          in.cr95 = 0:1, 
+                          in.cr96 = 0:1, 
+                          in.cr97 = 0:1)
+
+
+
+
+gc12 =covariate.predictions(cr_mod, data=guard_data12, indices = c(1:48), alpha=0.025)
+
+
+gc13 =covariate.predictions(cr_mod, data=guard_data12, indices = c(1177:1224), alpha=0.025)
+
+
+gc12_est <- gc12$estimates %>% 
+  data.frame() %>% 
+  select(-contains("in.cr"), in.cr = in.cr50) %>% 
+  mutate(year = "2012", 
+         day = par.index + 49) %>% 
+  filter((in.cr == 0 & day < 75) | (in.cr == 1 & day > 59))
+
+filter(gc12_est, day == 68) %>% 
+  select(estimate, se, lcl, ucl, in.cr, year) %>% 
+  mutate(across(c(estimate, se, lcl, ucl), ~round(., 3))) %>% 
+  view()
+
+gc13_est <- gc13$estimates %>% 
+  data.frame() %>% 
+  select(-contains("in.cr"), in.cr = in.cr50) %>% 
+  mutate(year = "2013", 
+         day = par.index - 1127) %>% 
+  filter((in.cr == 0 & day < 76) | (in.cr == 1 & day > 62))
+
+
+gc_est <- bind_rows(gc12_est, gc13_est) %>% 
+    mutate(lcl = ifelse(lcl < 0, 0, lcl),
+           ucl = ifelse(ucl > 1, 1, ucl),
+           in.cr = ifelse(in.cr == 0, "guarded", "creched"))
+
+gc_est %>% 
+    ggplot(group = as.factor(in.cr)) +
+    geom_line(aes(day, estimate, color = as.factor(in.cr))) +
+    geom_ribbon(aes(x = day, ymin = lcl, ymax = ucl, fill = as.factor(in.cr)), alpha = 0.2) +
+    theme_bw() +
+    facet_grid(~year) +
+  labs(color = "",
+       fill = "")
+
+
+# 
+flip_cr_mod <- readRDS(here("fitted_models/survival/step4_growth_surv"))$phi.year_T_hatch_tibgr_p.sat
+
+flip_cr_mod$results$beta[1:5,]
+
